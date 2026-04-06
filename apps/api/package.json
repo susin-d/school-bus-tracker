@@ -4,8 +4,10 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "build": "tsc -b tsconfig.json",
+    "build": "corepack pnpm --filter @school-bus/shared build && tsc -b tsconfig.json",
     "create:system-admin": "tsx src/scripts/create-system-admin.ts",
+    "check:dependencies": "tsx src/scripts/check-dependencies.ts",
+    "send:test-email": "tsx src/scripts/send-test-email.ts",
     "dev": "tsx watch src/index.ts",
     "lint": "tsc -b tsconfig.json --pretty false",
     "rls:seed": "tsx src/scripts/seed-rls-fixtures.ts",

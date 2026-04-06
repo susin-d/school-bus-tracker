@@ -8,6 +8,7 @@ import { buildForgotPasswordEmailHtml, buildForgotPasswordOtpEmailHtml, buildVer
 import { sendBrevoEmail } from "../../lib/email/brevo.js";
 import { idTokenSchema, otpSendSchema, otpVerifySchema, forgotPasswordSchema, emailVerificationSchema, streamTokenRequestSchema, emailLoginSchema, parentForgotPasswordOtpSendSchema, parentForgotPasswordOtpVerifySchema } from "../../lib/validation.js";
 import { requireUser } from "../../middleware/require-user.js";
+import { requireRole } from "../../middleware/require-role.js";
 import { assertUserCanAccessTrip, getUserProfileByAuthUserId } from "../../lib/data.js";
 import { getSupabaseAdminClient, getSupabasePublicClient, getSupabaseUser } from "../../lib/supabase.js";
 import { issueStreamToken } from "../../lib/stream-token.js";
@@ -19,7 +20,16 @@ const PARENT_RESET_RESEND_COOLDOWN_SECONDS = 60;
 const PARENT_RESET_MAX_ATTEMPTS = 5;
 
 function readOtpHashSecret() {
-  return process.env.PARENT_RESET_OTP_SECRET?.trim() || process.env.STREAM_TOKEN_SECRET?.trim() || "dev-parent-reset-otp-secret";
+  const secret = process.env.PARENT_RESET_OTP_SECRET?.trim() || process.env.STREAM_TOKEN_SECRET?.trim();
+  if (secret) {
+    return secret;
+  }
+
+  if (process.env.NODE_ENV === "test") {
+    return "test-parent-reset-otp-secret";
+  }
+
+  throw new HttpError(500, "Missing PARENT_RESET_OTP_SECRET or STREAM_TOKEN_SECRET", "missing_otp_secret");
 }
 
 function hashOtp(email: string, otp: string) {
@@ -271,7 +281,7 @@ authRouter.post("/forgot-password/parent-otp/verify", asyncHandler(async (reques
   });
 }));
 
-authRouter.post("/email/send-verification", asyncHandler(async (request, response) => {
+authRouter.post("/email/send-verification", requireUser, requireRole("admin", "super_admin"), asyncHandler(async (request, response) => {
   const body = emailVerificationSchema.parse(request.body);
   const adminClient = getSupabaseAdminClient();
   const { data: generated, error } = await adminClient.auth.admin.generateLink({

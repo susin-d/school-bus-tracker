@@ -20,6 +20,7 @@ function getBearerToken(request: Request) {
 export async function requireUser(request: Request, response: Response, next: NextFunction) {
   const token = getBearerToken(request);
   const headerUserId = request.header("x-user-id");
+  const isTestEnv = process.env.NODE_ENV === "test";
 
   if (token) {
     try {
@@ -44,6 +45,14 @@ export async function requireUser(request: Request, response: Response, next: Ne
       });
       return;
     }
+  }
+
+  if (!isTestEnv) {
+    response.status(401).json({
+      error: "Missing bearer token",
+      code: "missing_authentication"
+    });
+    return;
   }
 
   if (!headerUserId) {
