@@ -4,8 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "prebuild": "corepack pnpm --filter @school-bus/shared build",
-    "build": "tsc -b tsconfig.json",
+    "build": "tsc -b ../../packages/shared/tsconfig.json tsconfig.json",
     "create:system-admin": "tsx src/scripts/create-system-admin.ts",
     "check:dependencies": "tsx src/scripts/check-dependencies.ts",
     "send:test-email": "tsx src/scripts/send-test-email.ts",
