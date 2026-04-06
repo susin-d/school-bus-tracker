@@ -10,10 +10,12 @@
   ],
   "scripts": {
     "build": "corepack pnpm -r build",
+    "dev": "corepack pnpm --filter @school-bus/api dev",
     "dev:api": "corepack pnpm --filter @school-bus/api dev",
     "dev:admin": "corepack pnpm --filter @school-bus/admin-web dev",
     "dev:mobile": "flutter run -d chrome apps/mobile/lib/main.dart",
     "lint": "corepack pnpm -r lint",
+    "start": "corepack pnpm --filter @school-bus/api start",
     "typecheck": "corepack pnpm -r typecheck"
   }
 }

@@ -11,6 +11,7 @@
     "dev": "tsx watch src/index.ts",
     "lint": "tsc -b tsconfig.json --pretty false",
     "rls:seed": "tsx src/scripts/seed-rls-fixtures.ts",
+    "start": "node dist/index.js",
     "test": "vitest run",
     "test:rls": "vitest run tests/rls.integration.test.ts",
     "typecheck": "tsc -b tsconfig.json --pretty false"
