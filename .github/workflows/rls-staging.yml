@@ -1,0 +1,61 @@
+name: RLS Staging Integration
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/api/**"
+      - "supabase/migrations/**"
+      - ".github/workflows/rls-staging.yml"
+  pull_request:
+    paths:
+      - "apps/api/**"
+      - "supabase/migrations/**"
+      - ".github/workflows/rls-staging.yml"
+
+jobs:
+  rls-integration:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_DB_URL: ${{ secrets.STAGING_SUPABASE_DB_URL }}
+      CI: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate staging secrets
+        run: |
+          test -n "$SUPABASE_URL"
+          test -n "$SUPABASE_ANON_KEY"
+          test -n "$SUPABASE_SERVICE_ROLE_KEY"
+          test -n "$SUPABASE_DB_URL"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Apply Supabase migrations to staging branch DB
+        run: supabase db push --db-url "$SUPABASE_DB_URL"
+
+      - name: Seed deterministic RLS fixtures and export tokens
+        run: RLS_ENV_OUTPUT_PATH="$GITHUB_ENV" corepack pnpm --filter @school-bus/api rls:seed
+
+      - name: Run RLS integration tests (must not skip)
+        run: corepack pnpm --filter @school-bus/api test:rls

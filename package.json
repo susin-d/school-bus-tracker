@@ -1,0 +1,19 @@
+{
+  "name": "school-bus-bridge",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.0.0",
+  "workspaces": [
+    "apps/api",
+    "apps/admin-web",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "corepack pnpm -r build",
+    "dev:api": "corepack pnpm --filter @school-bus/api dev",
+    "dev:admin": "corepack pnpm --filter @school-bus/admin-web dev",
+    "dev:mobile": "flutter run -d chrome apps/mobile/lib/main.dart",
+    "lint": "corepack pnpm -r lint",
+    "typecheck": "corepack pnpm -r typecheck"
+  }
+}

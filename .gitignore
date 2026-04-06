@@ -1,0 +1,15 @@
+node_modules/
+.pnpm-store/
+dist/
+build/
+.expo/
+.turbo/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.melos_tool/
+.DS_Store
+coverage/
+.env
+.env.*
+!.env.example
