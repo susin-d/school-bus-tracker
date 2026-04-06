@@ -1,0 +1,3 @@
+{
+  "buildCommand": "tsc -b ../../packages/shared/tsconfig.json tsconfig.json"
+}
