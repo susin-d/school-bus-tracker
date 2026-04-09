@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_scope.dart';
 import 'auth_api.dart';
+import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -12,29 +13,20 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _loginFormKey = GlobalKey<FormState>();
-  final _forgotFormKey = GlobalKey<FormState>();
 
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _forgotEmailController = TextEditingController();
-  final _redirectController = TextEditingController(
-    text: const String.fromEnvironment('AUTH_REDIRECT_URL', defaultValue: ''),
-  );
 
   final _authApi = AuthApi();
 
   bool _busy = false;
   bool _obscurePassword = true;
-  bool _showForgotPassword = false;
   String? _errorMessage;
-  String? _successMessage;
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
-    _forgotEmailController.dispose();
-    _redirectController.dispose();
     super.dispose();
   }
 
@@ -97,8 +89,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               children: [
                                 _buildIntroPanel(theme),
                                 const SizedBox(height: 16),
-                                if (_errorMessage != null ||
-                                    _successMessage != null) ...[
+                                if (_errorMessage != null) ...[
                                   _buildMessageBanner(theme),
                                   const SizedBox(height: 14),
                                 ],
@@ -107,26 +98,11 @@ class _LoginScreenState extends State<LoginScreen> {
                                 Align(
                                   alignment: Alignment.centerRight,
                                   child: TextButton(
-                                    onPressed: _busy
-                                        ? null
-                                        : () {
-                                            setState(() {
-                                              _showForgotPassword =
-                                                  !_showForgotPassword;
-                                              _clearMessages();
-                                            });
-                                          },
-                                    child: Text(
-                                      _showForgotPassword
-                                          ? 'Hide forgot password'
-                                          : 'Forgot password?',
-                                    ),
+                                    onPressed:
+                                        _busy ? null : _openForgotPassword,
+                                    child: const Text('Forgot password?'),
                                   ),
                                 ),
-                                if (_showForgotPassword) ...[
-                                  const SizedBox(height: 4),
-                                  _buildForgotPasswordForm(theme),
-                                ],
                               ],
                             ),
                           ),
@@ -197,37 +173,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w700,
                   color: colorScheme.primary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Parent Login',
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Sign in securely to access student tracking, attendance updates, and school alerts.',
-            style: theme.textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Icon(
-                Icons.verified_user_outlined,
-                size: 16,
-                color: colorScheme.primary,
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  'Role-based access with protected parent data',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
                 ),
               ),
             ],
@@ -313,59 +258,10 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildForgotPasswordForm(ThemeData theme) {
-    return Form(
-      key: _forgotFormKey,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Reset your password', style: theme.textTheme.titleMedium),
-          const SizedBox(height: 8),
-          Text(
-            'Enter your registered email to receive reset instructions.',
-            style: theme.textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: _forgotEmailController,
-            keyboardType: TextInputType.emailAddress,
-            textInputAction: TextInputAction.done,
-            autofillHints: const [AutofillHints.email],
-            enabled: !_busy,
-            validator: _validateEmail,
-            onFieldSubmitted: (_) {
-              if (!_busy) {
-                _handleForgotPassword();
-              }
-            },
-            decoration: const InputDecoration(
-              labelText: 'Registered Email',
-              hintText: 'parent@school.com',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.tonal(
-              onPressed: _busy ? null : _handleForgotPassword,
-              child: const Text('Send Reset Email'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildMessageBanner(ThemeData theme) {
-    final isError = _errorMessage != null;
-    final content = _errorMessage ?? _successMessage ?? '';
-    final bannerColor = isError
-        ? theme.colorScheme.errorContainer
-        : theme.colorScheme.primaryContainer;
-    final textColor = isError
-        ? theme.colorScheme.onErrorContainer
-        : theme.colorScheme.onPrimaryContainer;
+    final content = _errorMessage ?? '';
+    final bannerColor = theme.colorScheme.errorContainer;
+    final textColor = theme.colorScheme.onErrorContainer;
 
     return Container(
       width: double.infinity,
@@ -406,27 +302,19 @@ class _LoginScreenState extends State<LoginScreen> {
     });
   }
 
-  Future<void> _handleForgotPassword() async {
-    if (!_forgotFormKey.currentState!.validate()) {
-      return;
-    }
-
-    final email = _forgotEmailController.text.trim();
-    await _runAsync(() async {
-      await _authApi.sendForgotPassword(
-        email: email,
-        redirectTo: _redirectController.text.trim().isEmpty
-            ? null
-            : _redirectController.text.trim(),
-      );
-      _setSuccess('Password reset email sent. Please check your inbox.');
-    });
+  Future<void> _openForgotPassword() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            ForgotPasswordScreen(initialEmail: _emailController.text.trim()),
+      ),
+    );
   }
 
   Future<void> _runAsync(Future<void> Function() action) async {
     setState(() {
       _busy = true;
-      _clearMessages();
+      _errorMessage = null;
     });
     try {
       await action();
@@ -453,28 +341,12 @@ class _LoginScreenState extends State<LoginScreen> {
     return null;
   }
 
-  void _clearMessages() {
-    _errorMessage = null;
-    _successMessage = null;
-  }
-
   void _setError(String message) {
     if (!mounted) {
       return;
     }
     setState(() {
       _errorMessage = message;
-      _successMessage = null;
-    });
-  }
-
-  void _setSuccess(String message) {
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _successMessage = message;
-      _errorMessage = null;
     });
   }
 
@@ -487,29 +359,5 @@ class _LoginScreenState extends State<LoginScreen> {
       return raw.replaceFirst('FormatException: ', '');
     }
     return raw;
-  }
-}
-
-class _QuickPill extends StatelessWidget {
-  const _QuickPill({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: colorScheme.surface.withValues(alpha: 0.7),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-      ),
-    );
   }
 }
