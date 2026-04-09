@@ -17,7 +17,7 @@
     "typecheck": "tsc -b tsconfig.json --pretty false"
   },
   "dependencies": {
-    "@school-bus/shared": "workspace:*",
+    "@school-bus/shared": "0.1.0",
     "@supabase/supabase-js": "^2.101.1",
     "cors": "^2.8.5",
     "express": "^5.1.0",

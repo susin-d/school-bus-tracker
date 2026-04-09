@@ -959,6 +959,58 @@ const adminCollectionMap = {
 
 export type AdminResource = keyof typeof adminCollectionMap;
 
+type AdminResourcePayload = Record<string, unknown>;
+
+const adminResourceFieldMap: Record<AdminResource, readonly string[]> = {
+  schools: ["name", "timezone"],
+  users: ["full_name", "role", "status", "school_id"],
+  routes: ["name", "code", "status", "school_id"],
+  stops: ["name", "code", "address", "status", "school_id"],
+  buses: ["label", "registration_no", "capacity", "status", "school_id"],
+  drivers: ["user_id", "license_no", "status", "school_id"],
+  students: ["full_name", "grade", "address_text", "status", "school_id"],
+  assignments: ["student_id", "route_id", "stop_id", "bus_id", "status", "school_id"]
+};
+
+function asTrimmedString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function sanitizeAdminResourcePayload(
+  resource: AdminResource,
+  payload: AdminResourcePayload,
+  schoolId: string | undefined
+) {
+  const allowedFields = adminResourceFieldMap[resource];
+  const sanitized: Record<string, unknown> = {};
+
+  for (const field of allowedFields) {
+    const value = payload[field];
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (trimmed.length > 0) {
+        sanitized[field] = trimmed;
+      }
+      continue;
+    }
+
+    if (value !== undefined && value !== null) {
+      sanitized[field] = value;
+    }
+  }
+
+  if (resource !== "schools") {
+    const scopedSchoolId = asTrimmedString(payload.school_id) || asTrimmedString(schoolId);
+    if (!scopedSchoolId) {
+      throw new HttpError(400, "school_id is required", "missing_school_id");
+    }
+
+    sanitized.school_id = scopedSchoolId;
+  }
+
+  return sanitized;
+}
+
 function getAdminTable(resource: AdminResource) {
   return adminCollectionMap[resource];
 }
@@ -991,19 +1043,11 @@ export async function listAdminResources(
 }
 
 export async function createAdminResource(resource: AdminResource, schoolId: string | undefined, payload: Record<string, unknown>) {
-  const basePayload =
-    resource === "schools"
-      ? {
-          ...payload,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
-      : {
-          ...payload,
-          school_id: payload.school_id ?? schoolId ?? null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
+  const basePayload = {
+    ...sanitizeAdminResourcePayload(resource, payload, schoolId),
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
 
   const { data, error } = await getSupabaseAdminClient()
     .from(getAdminTable(resource))
@@ -1024,12 +1068,14 @@ export async function updateAdminResource(
   schoolId: string | undefined,
   payload: Record<string, unknown>
 ) {
+  const basePayload = {
+    ...sanitizeAdminResourcePayload(resource, payload, schoolId),
+    updated_at: new Date().toISOString()
+  };
+
   let query = getSupabaseAdminClient()
     .from(getAdminTable(resource))
-    .update({
-      ...payload,
-      updated_at: new Date().toISOString()
-    })
+    .update(basePayload)
     .eq("id", resourceId);
 
   if (resource !== "schools" && schoolId) {

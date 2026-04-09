@@ -10,6 +10,8 @@ import {
 import type { AdminRouteKey } from "./roleAccess";
 
 const routeMap: Record<string, AdminRouteKey> = {
+  "#/landing": "landing",
+  "#/login": "login",
   "#/": "dashboard",
   "#/live-map": "liveMap",
   "#/schools": "schools",
@@ -26,6 +28,8 @@ const routeMap: Record<string, AdminRouteKey> = {
 };
 
 const reverseRouteMap: Record<AdminRouteKey, string> = {
+  landing: "#/landing",
+  login: "#/login",
   dashboard: "#/",
   liveMap: "#/live-map",
   schools: "#/schools",
@@ -49,7 +53,7 @@ type RouterContextValue = {
 const RouterContext = createContext<RouterContextValue | null>(null);
 
 function resolveRoute(hash: string): AdminRouteKey {
-  return routeMap[hash] ?? "dashboard";
+  return routeMap[hash] ?? "landing";
 }
 
 export function AdminRouterProvider({ children }: PropsWithChildren) {
@@ -65,7 +69,7 @@ export function AdminRouterProvider({ children }: PropsWithChildren) {
     window.addEventListener("hashchange", handleHashChange);
 
     if (!window.location.hash) {
-      window.location.hash = reverseRouteMap.dashboard;
+      window.location.hash = reverseRouteMap.landing;
     }
 
     return () => {

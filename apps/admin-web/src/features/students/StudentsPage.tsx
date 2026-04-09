@@ -4,6 +4,7 @@ import { AppShell } from "../../app/AppShell";
 import { createStudent, deleteStudent, geocodeStudentAddress, listStudents, updateStudent } from "../../core/api";
 import { useRequiredAdminUser } from "../../core/auth";
 import { useResource } from "../../core/useResource";
+import { StudentsOverview } from "./StudentsOverview";
 
 export function StudentsPage() {
   const currentUser = useRequiredAdminUser();
@@ -104,6 +105,9 @@ export function StudentsPage() {
       }
       activeRoute="students"
     >
+      <section className="panel-grid compact" style={{ marginTop: 20 }}>
+        <StudentsOverview view={currentUser.role === "super_admin" ? "super_admin" : "school_admin"} />
+      </section>
       <section className="resource-panel">
         <header className="resource-header">
           <div>

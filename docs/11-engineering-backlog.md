@@ -2,7 +2,7 @@
 
 ## Platform Setup
 
-- Create pnpm workspace for `apps/api`, `apps/admin-web`, and `packages/shared`
+- Create npm workspaces for `apps/api`, `apps/admin-web`, and `packages/shared`
 - Create Flutter project structure in `apps/mobile`
 - Add environment loading strategy per app
 - Add base lint and formatting config

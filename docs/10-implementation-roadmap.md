@@ -2,7 +2,7 @@
 
 ## Milestone 0: Foundation
 
-- Initialize monorepo with pnpm for backend/web and Flutter for mobile
+- Initialize monorepo with npm workspaces for backend/web and Flutter for mobile
 - Configure TypeScript, ESLint, and shared tsconfig for API and admin web
 - Create shared package for roles, enums, and API contracts
 - Set up CI for lint, typecheck, Flutter analyze, and tests

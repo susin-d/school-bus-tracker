@@ -4,6 +4,7 @@ import { AppShell } from "../../app/AppShell";
 import { createUser, deleteUser, listUsers, updateUser } from "../../core/api";
 import { useRequiredAdminUser } from "../../core/auth";
 import { useResource } from "../../core/useResource";
+import { UsersOverview } from "./UsersOverview";
 
 export function UsersPage() {
   const currentUser = useRequiredAdminUser();
@@ -81,6 +82,9 @@ export function UsersPage() {
       }
       activeRoute="users"
     >
+      <section className="panel-grid compact" style={{ marginTop: 20 }}>
+        <UsersOverview view={currentUser.role === "super_admin" ? "super_admin" : "school_admin"} />
+      </section>
       <section className="resource-panel">
         <header className="resource-header">
           <div>

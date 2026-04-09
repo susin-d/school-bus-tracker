@@ -9,7 +9,7 @@ Make role security testable and enforced in CI with deterministic fixtures.
 - Script:
   - `apps/api/src/scripts/seed-rls-fixtures.ts`
 - Command:
-  - `corepack pnpm --filter @school-bus/api rls:seed`
+  - `npm run -w @school-bus/api rls:seed`
 - Seeds:
   - 2 schools
   - super admin
@@ -24,7 +24,7 @@ Make role security testable and enforced in CI with deterministic fixtures.
 - File:
   - `apps/api/tests/rls.integration.test.ts`
 - Command:
-  - `corepack pnpm --filter @school-bus/api test:rls`
+  - `npm run -w @school-bus/api test:rls`
 
 ## Required Test Env
 

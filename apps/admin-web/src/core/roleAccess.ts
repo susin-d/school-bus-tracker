@@ -1,6 +1,8 @@
 import type { Role } from "@school-bus/shared";
 
 export type AdminRouteKey =
+  | "landing"
+  | "login"
   | "dashboard"
   | "liveMap"
   | "schools"
@@ -46,6 +48,8 @@ export const previewUsers: AdminPreviewUser[] = [
 ];
 
 export const routeLabels: Record<AdminRouteKey, string> = {
+  landing: "Landing",
+  login: "Login",
   dashboard: "Dashboard",
   liveMap: "Live Map",
   schools: "Schools",

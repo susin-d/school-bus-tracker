@@ -4,6 +4,7 @@ import { AppShell } from "../../app/AppShell";
 import { listLeaveRequests, updateLeaveRequestStatus } from "../../core/api";
 import { useRequiredAdminUser } from "../../core/auth";
 import { useResource } from "../../core/useResource";
+import { LeaveRequestsOverview } from "./LeaveRequestsOverview";
 
 export function LeaveRequestsPage() {
   const currentUser = useRequiredAdminUser();
@@ -34,6 +35,9 @@ export function LeaveRequestsPage() {
       }
       activeRoute="leaveRequests"
     >
+      <section className="panel-grid compact" style={{ marginTop: 20 }}>
+        <LeaveRequestsOverview view={currentUser.role === "super_admin" ? "super_admin" : "school_admin"} />
+      </section>
       <section className="resource-panel">
         <header className="resource-header">
           <div>

@@ -2,7 +2,7 @@ import { AppShell } from "../../app/AppShell";
 import { getDashboard, listPlannerRuns } from "../../core/api";
 import { useRequiredAdminUser } from "../../core/auth";
 import { useResource } from "../../core/useResource";
-import { roleContent } from "../shared/content";
+import { roleContent, screenPlan } from "../shared/content";
 
 export function DashboardPage() {
   const currentUser = useRequiredAdminUser();
@@ -49,6 +49,41 @@ export function DashboardPage() {
             </ul>
           </article>
         ))}
+      </section>
+
+      <section className="resource-panel" style={{ marginTop: 20 }}>
+        <header className="resource-header">
+          <div>
+            <p className="eyebrow">Product Coverage</p>
+            <h2>Screen Plan</h2>
+          </div>
+        </header>
+        <div className="panel-grid compact">
+          <article className="panel">
+            <h2>Parent App</h2>
+            <ul className="stack-list">
+              {screenPlan.parent.map((screen) => (
+                <li key={screen}>{screen}</li>
+              ))}
+            </ul>
+          </article>
+          <article className="panel">
+            <h2>School Admin</h2>
+            <ul className="stack-list">
+              {screenPlan.schoolAdmin.map((screen) => (
+                <li key={screen}>{screen}</li>
+              ))}
+            </ul>
+          </article>
+          <article className="panel">
+            <h2>Super Admin</h2>
+            <ul className="stack-list">
+              {screenPlan.superAdmin.map((screen) => (
+                <li key={screen}>{screen}</li>
+              ))}
+            </ul>
+          </article>
+        </div>
       </section>
 
       <section className="resource-panel" style={{ marginTop: 20 }}>

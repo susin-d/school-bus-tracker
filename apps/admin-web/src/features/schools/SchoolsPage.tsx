@@ -4,6 +4,7 @@ import { AppShell } from "../../app/AppShell";
 import { createSchool, deleteSchool, listSchools, updateSchool } from "../../core/api";
 import { useRequiredAdminUser } from "../../core/auth";
 import { useResource } from "../../core/useResource";
+import { SchoolsOverview } from "./SchoolsOverview";
 
 export function SchoolsPage() {
   const currentUser = useRequiredAdminUser();
@@ -73,6 +74,9 @@ export function SchoolsPage() {
       subtitle="Global school management and rollout visibility for the platform owner."
       activeRoute="schools"
     >
+      <section className="panel-grid compact" style={{ marginTop: 20 }}>
+        <SchoolsOverview view={currentUser.role === "super_admin" ? "super_admin" : "school_admin"} />
+      </section>
       <section className="resource-panel">
         <header className="resource-header">
           <div>

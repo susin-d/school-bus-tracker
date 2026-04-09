@@ -1,16 +1,15 @@
 import { Router, type Router as ExpressRouter } from "express";
 import { createHash, randomInt } from "node:crypto";
 
-import type { AuthSessionResponse, CreateSessionRequest, StreamTokenResponse } from "@school-bus/shared";
+import type { AuthSessionResponse, StreamTokenResponse } from "@school-bus/shared";
 
 import { asyncHandler, HttpError } from "../../lib/http.js";
 import { buildForgotPasswordEmailHtml, buildForgotPasswordOtpEmailHtml, buildVerificationEmailHtml, buildWelcomeEmailHtml } from "../../lib/email/templates.js";
 import { sendBrevoEmail } from "../../lib/email/brevo.js";
-import { idTokenSchema, otpSendSchema, otpVerifySchema, forgotPasswordSchema, emailVerificationSchema, streamTokenRequestSchema, emailLoginSchema, parentForgotPasswordOtpSendSchema, parentForgotPasswordOtpVerifySchema } from "../../lib/validation.js";
+import { otpSendSchema, otpVerifySchema, forgotPasswordSchema, emailVerificationSchema, streamTokenRequestSchema, emailLoginSchema, parentForgotPasswordOtpSendSchema, parentForgotPasswordOtpVerifySchema } from "../../lib/validation.js";
 import { requireUser } from "../../middleware/require-user.js";
-import { requireRole } from "../../middleware/require-role.js";
 import { assertUserCanAccessTrip, getUserProfileByAuthUserId } from "../../lib/data.js";
-import { getSupabaseAdminClient, getSupabasePublicClient, getSupabaseUser } from "../../lib/supabase.js";
+import { getSupabaseAdminClient, getSupabasePublicClient } from "../../lib/supabase.js";
 import { issueStreamToken } from "../../lib/stream-token.js";
 
 export const authRouter: ExpressRouter = Router();
@@ -18,6 +17,10 @@ export const authRouter: ExpressRouter = Router();
 const PARENT_RESET_OTP_EXPIRY_MINUTES = 10;
 const PARENT_RESET_RESEND_COOLDOWN_SECONDS = 60;
 const PARENT_RESET_MAX_ATTEMPTS = 5;
+
+function isDevelopmentEnv() {
+  return (process.env.NODE_ENV ?? "").trim().toLowerCase() === "development";
+}
 
 function readOtpHashSecret() {
   const secret = process.env.PARENT_RESET_OTP_SECRET?.trim() || process.env.STREAM_TOKEN_SECRET?.trim();
@@ -188,19 +191,30 @@ authRouter.post("/forgot-password/parent-otp/send", asyncHandler(async (request,
       ? parentUser.full_name.trim()
       : email;
 
-  await sendBrevoEmail({
-    to: [{ email, name: fullName }],
-    subject: "SchoolBus Bridge password reset OTP",
-    htmlContent: buildForgotPasswordOtpEmailHtml({
-      fullName,
+  if (isDevelopmentEnv()) {
+    console.info(JSON.stringify({
+      scope: "auth",
+      event: "parent_reset_otp_issued_dev",
+      email,
       otp,
       expiresInMinutes: PARENT_RESET_OTP_EXPIRY_MINUTES
-    })
-  });
+    }));
+  } else {
+    await sendBrevoEmail({
+      to: [{ email, name: fullName }],
+      subject: "SchoolBus Bridge password reset OTP",
+      htmlContent: buildForgotPasswordOtpEmailHtml({
+        fullName,
+        otp,
+        expiresInMinutes: PARENT_RESET_OTP_EXPIRY_MINUTES
+      })
+    });
+  }
 
   response.json({
     success: true,
-    email
+    email,
+    ...(isDevelopmentEnv() ? { devOtp: otp } : {})
   });
 }));
 
@@ -281,12 +295,32 @@ authRouter.post("/forgot-password/parent-otp/verify", asyncHandler(async (reques
   });
 }));
 
-authRouter.post("/email/send-verification", requireUser, requireRole("admin", "super_admin"), asyncHandler(async (request, response) => {
+authRouter.post("/email/send-verification", asyncHandler(async (request, response) => {
   const body = emailVerificationSchema.parse(request.body);
   const adminClient = getSupabaseAdminClient();
+  const normalizedEmail = body.email.trim().toLowerCase();
+
+  const { data: userRows, error: userLookupError } = await adminClient
+    .from("users")
+    .select("id")
+    .eq("email", normalizedEmail)
+    .limit(1);
+
+  if (userLookupError) {
+    throw new HttpError(500, userLookupError.message, "verification_user_lookup_failed");
+  }
+
+  if (!userRows?.length) {
+    response.json({
+      success: true,
+      email: normalizedEmail
+    });
+    return;
+  }
+
   const { data: generated, error } = await adminClient.auth.admin.generateLink({
     type: "magiclink",
-    email: body.email,
+    email: normalizedEmail,
     options: body.redirectTo ? { redirectTo: body.redirectTo } : undefined
   });
 
@@ -295,7 +329,7 @@ authRouter.post("/email/send-verification", requireUser, requireRole("admin", "s
   }
 
   await sendBrevoEmail({
-    to: [{ email: body.email, name: body.fullName }],
+    to: [{ email: normalizedEmail, name: body.fullName }],
     subject: "Verify your SchoolBus Bridge email",
     htmlContent: buildVerificationEmailHtml({
       fullName: body.fullName,
@@ -304,7 +338,7 @@ authRouter.post("/email/send-verification", requireUser, requireRole("admin", "s
   });
 
   await sendBrevoEmail({
-    to: [{ email: body.email, name: body.fullName }],
+    to: [{ email: normalizedEmail, name: body.fullName }],
     subject: "Welcome to SchoolBus Bridge",
     htmlContent: buildWelcomeEmailHtml({
       fullName: body.fullName
@@ -313,27 +347,8 @@ authRouter.post("/email/send-verification", requireUser, requireRole("admin", "s
 
   response.json({
     success: true,
-    email: body.email
+    email: normalizedEmail
   });
-}));
-
-authRouter.post("/session", asyncHandler(async (request, response) => {
-  const body = idTokenSchema.parse(request.body as Partial<CreateSessionRequest>);
-  const accessToken = body.accessToken ?? body.idToken ?? "";
-
-  const authUser = await getSupabaseUser(accessToken);
-  const user = await getUserProfileByAuthUserId(authUser.id);
-
-  if (!user) {
-    throw new HttpError(404, "No SchoolBus user profile found for this Supabase account", "user_profile_not_found");
-  }
-
-  const payload: AuthSessionResponse = {
-    token: accessToken,
-    user
-  };
-
-  response.json(payload);
 }));
 
 authRouter.post("/email-login", asyncHandler(async (request, response) => {
@@ -398,3 +413,4 @@ authRouter.post("/stream-token", requireUser, asyncHandler(async (request, respo
 
   response.json(payload);
 }));
+

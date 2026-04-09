@@ -12,12 +12,12 @@ Monorepo scaffold for the SchoolBus Bridge platform.
 
 ## Workspace Commands
 
-- `pnpm dev:api`
-- `pnpm dev:admin`
+- `npm run dev:api`
+- `npm run dev:admin`
 - `flutter run` from `apps/mobile`
 - `flutter run` from `apps/driver-mobile`
-- `pnpm typecheck`
-- `pnpm build`
+- `npm run typecheck`
+- `npm run build`
 
 ## Current State
 
@@ -69,9 +69,9 @@ Route planning supports both:
 CI enforcement:
 - Staging pipeline: `.github/workflows/rls-staging.yml`
 - Seeds deterministic fixtures + tokens via:
-  - `corepack pnpm --filter @school-bus/api rls:seed`
+  - `npm run -w @school-bus/api rls:seed`
 - Runs mandatory RLS suite:
-  - `corepack pnpm --filter @school-bus/api test:rls`
+  - `npm run -w @school-bus/api test:rls`
   - In CI, missing RLS env now fails the run instead of skipping.
 
 ## Additional Env (Password Reset OTP)

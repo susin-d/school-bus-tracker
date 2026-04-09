@@ -4,6 +4,7 @@ import { AppShell } from "../../app/AppShell";
 import { acknowledgeAlert, listAlerts, resolveAlert } from "../../core/api";
 import { useRequiredAdminUser } from "../../core/auth";
 import { useResource } from "../../core/useResource";
+import { AlertsOverview } from "./AlertsOverview";
 
 export function AlertsPage() {
   const currentUser = useRequiredAdminUser();
@@ -44,6 +45,9 @@ export function AlertsPage() {
       }
       activeRoute="alerts"
     >
+      <section className="panel-grid compact" style={{ marginTop: 20 }}>
+        <AlertsOverview view={currentUser.role === "super_admin" ? "super_admin" : "school_admin"} />
+      </section>
       <section className="resource-panel">
         <header className="resource-header">
           <div>

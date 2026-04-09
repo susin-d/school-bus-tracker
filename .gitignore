@@ -1,5 +1,4 @@
 node_modules/
-.pnpm-store/
 dist/
 build/
 .expo/
@@ -10,6 +9,7 @@ build/
 .melos_tool/
 .DS_Store
 coverage/
+*.tsbuildinfo
 .env
 .env.*
 !.env.example

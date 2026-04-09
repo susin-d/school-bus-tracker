@@ -96,10 +96,25 @@ export const alertResolutionSchema = z.object({
 });
 
 export const adminResourceSchema = z.object({
+  school_id: z.string().min(1).optional(),
   name: z.string().min(1).optional(),
   fullName: z.string().min(1).optional(),
-  status: z.string().optional()
-}).catchall(z.unknown());
+  timezone: z.string().min(1).optional(),
+  code: z.string().min(1).optional(),
+  address: z.string().min(1).optional(),
+  label: z.string().min(1).optional(),
+  registration_no: z.string().min(1).optional(),
+  license_no: z.string().min(1).optional(),
+  capacity: z.string().min(1).optional(),
+  role: z.string().min(1).optional(),
+  status: z.string().min(1).optional(),
+  grade: z.string().min(1).optional(),
+  address_text: z.string().min(1).optional(),
+  student_id: z.string().min(1).optional(),
+  route_id: z.string().min(1).optional(),
+  stop_id: z.string().min(1).optional(),
+  bus_id: z.string().min(1).optional()
+}).strict();
 
 export const geocodeStudentSchema = z.object({
   addressText: z.string().min(5).optional()

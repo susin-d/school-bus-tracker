@@ -40,11 +40,8 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Enable Corepack
-        run: corepack enable
-
       - name: Install dependencies
-        run: corepack pnpm install --frozen-lockfile
+        run: npm ci
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
@@ -55,7 +52,7 @@ jobs:
         run: supabase db push --db-url "$SUPABASE_DB_URL"
 
       - name: Seed deterministic RLS fixtures and export tokens
-        run: RLS_ENV_OUTPUT_PATH="$GITHUB_ENV" corepack pnpm --filter @school-bus/api rls:seed
+        run: RLS_ENV_OUTPUT_PATH="$GITHUB_ENV" npm run -w @school-bus/api rls:seed
 
       - name: Run RLS integration tests (must not skip)
-        run: corepack pnpm --filter @school-bus/api test:rls
+        run: npm run -w @school-bus/api test:rls

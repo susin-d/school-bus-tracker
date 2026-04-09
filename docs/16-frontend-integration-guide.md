@@ -54,13 +54,13 @@ Keep all frontend apps role-safe and backend-driven for auth, data, and realtime
 ## Testing Checklist
 
 - Admin web typecheck:
-  - `corepack pnpm --filter @school-bus/admin-web typecheck`
+  - `npm run -w @school-bus/admin-web typecheck`
 - Parent app:
   - `flutter analyze` and `flutter test` in `apps/mobile`
 - Driver app:
   - `flutter analyze` and `flutter test` in `apps/driver-mobile`
 - API contracts:
-  - `corepack pnpm --filter @school-bus/api test`
+  - `npm run -w @school-bus/api test`
 
 ## Contract Drift Prevention
 

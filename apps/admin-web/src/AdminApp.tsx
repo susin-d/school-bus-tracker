@@ -6,6 +6,7 @@ import { useAdminRouter } from "./core/router";
 import { AlertsPage } from "./features/alerts/AlertsPage";
 import { AssignmentsPage } from "./features/assignments/AssignmentsPage";
 import { AdminAuthScreen } from "./features/auth/AdminAuthScreen";
+import { AdminLandingPage } from "./features/auth/AdminLandingPage";
 import { BusesPage } from "./features/buses/BusesPage";
 import { DashboardPage } from "./features/dashboard/DashboardPage";
 import { DriversPage } from "./features/drivers/DriversPage";
@@ -21,6 +22,14 @@ import { UsersPage } from "./features/users/UsersPage";
 export function AdminApp() {
   const { currentUser, mode } = useAdminSession();
   const { currentRoute, navigate } = useAdminRouter();
+
+  if (currentRoute === "landing") {
+    return <AdminLandingPage />;
+  }
+
+  if (currentRoute === "login") {
+    return <AdminAuthScreen />;
+  }
 
   if (mode === "session" && !currentUser) {
     return <AdminAuthScreen />;

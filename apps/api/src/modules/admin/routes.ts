@@ -28,7 +28,6 @@ function assertAdminResource(value: string): AdminResource {
 
   throw new HttpError(404, "Unknown admin resource", "unknown_admin_resource");
 }
-
 adminRouter.use(requireUser);
 adminRouter.use(requireRole("admin", "super_admin"));
 

@@ -73,6 +73,7 @@ export function LiveMapPage() {
   const [sseConnected, setSseConnected] = useState(false);
   const [selectedTripId, setSelectedTripId] = useState<string | undefined>(undefined);
   const [mapError, setMapError] = useState<string | undefined>(undefined);
+  const [streamError, setStreamError] = useState<string | undefined>(undefined);
   const lastEventTimeRef = useRef<string | undefined>(undefined);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -199,6 +200,7 @@ export function LiveMapPage() {
         source.onopen = () => {
           reconnectAttempt = 0;
           setSseConnected(true);
+          setStreamError(undefined);
         };
         source.onmessage = (event) => {
           try {
@@ -206,7 +208,7 @@ export function LiveMapPage() {
             lastEventTimeRef.current = parsed.occurredAt;
             setStreamEvents((previous) => [parsed, ...previous].slice(0, 30));
           } catch {
-            // Ignore malformed events and keep stream alive.
+            setStreamError("Received malformed realtime event payload; stream is still connected.");
           }
         };
         source.onerror = () => {
@@ -221,6 +223,7 @@ export function LiveMapPage() {
         };
       } catch {
         setSseConnected(false);
+        setStreamError("Realtime stream unavailable; retrying with polling fallback.");
       }
     };
 
@@ -232,6 +235,7 @@ export function LiveMapPage() {
         window.clearTimeout(reconnectTimer);
       }
       setSseConnected(false);
+      setStreamError(undefined);
       source?.close();
     };
   }, [currentUser.id, schoolScope, selectedTripId]);
@@ -503,6 +507,7 @@ export function LiveMapPage() {
             <h2>Latest Incidents + ETA Updates</h2>
           </div>
         </header>
+        {streamError && <p className="panel-summary error-copy">{streamError}</p>}
         <div className="panel-grid compact">
           {recentEvents.map((event) => (
             <article className="panel" key={event.id}>

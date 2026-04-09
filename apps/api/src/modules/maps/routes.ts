@@ -1,4 +1,4 @@
-import { Router, type Request, type Response, type Router as ExpressRouter } from "express";
+import { Router, type Request, type Router as ExpressRouter } from "express";
 
 import type {
   DriversLiveMapResponse,
@@ -139,26 +139,4 @@ mapsRouter.get("/events", asyncHandler(async (request, response) => {
   response.json(payload);
 }));
 
-mapsRouter.get("/drivers/live", requireRole("admin", "super_admin"), asyncHandler(async (request, response) => {
-  const schoolId =
-    request.currentUser!.role === "super_admin" && typeof request.query.schoolId === "string"
-      ? request.query.schoolId
-      : request.currentUser!.role === "super_admin"
-        ? undefined
-        : request.currentUser!.schoolId;
 
-  if (!schoolId && request.currentUser!.role !== "super_admin") {
-    throw new HttpError(400, "schoolId is required", "missing_school_id");
-  }
-
-  const drivers = await listLiveDrivers({
-    actor: request.currentUser!,
-    schoolId,
-    clusterMode: request.currentUser!.role === "super_admin" && request.query.clusterMode === "grid" ? "grid" : undefined
-  });
-
-  const payload: DriversLiveMapResponse = {
-    drivers
-  };
-  response.json(payload);
-}));
