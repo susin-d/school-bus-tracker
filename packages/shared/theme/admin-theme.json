@@ -1,0 +1,24 @@
+{
+  "name": "schoolbus-admin-theme",
+  "version": "1.0.0",
+  "mode": "light",
+  "tokens": {
+    "bg": "#FFF8F2",
+    "panel": "#FFFFFF",
+    "panelBorder": "#834A1C",
+    "ink": "#3F2413",
+    "muted": "#7F5E44",
+    "accent": "#F07A1F",
+    "accentSoft": "#FFE2C4",
+    "accentStrong": "#8B4B1F",
+    "warm": "#FFF2E2",
+    "danger": "#C23B1B",
+    "navBorder": "#B57033",
+    "navBackground": "#FFFFFF",
+    "inputBackground": "#FFFFFF",
+    "inputBorder": "#834A1C",
+    "tableBorder": "#834A1C",
+    "bodyGradientStart": "#FFFFFF",
+    "bodyGradientEnd": "#FFF8F2"
+  }
+}

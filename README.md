@@ -6,7 +6,7 @@ Monorepo scaffold for the SchoolBus Bridge platform.
 
 - `apps/api` - Node.js + Express API for auth, trips, attendance, alerts, and admin operations
 - `apps/admin-web` - React admin dashboard
-- `apps/mobile` - Flutter app for parent and driver roles
+- `apps/parents-app` - Flutter app for parent and driver roles
 - `apps/driver-mobile` - Flutter app dedicated to driver operations
 - `packages/shared` - shared TypeScript domain types for backend and web
 
@@ -14,7 +14,7 @@ Monorepo scaffold for the SchoolBus Bridge platform.
 
 - `npm run dev:api`
 - `npm run dev:admin`
-- `flutter run` from `apps/mobile`
+- `flutter run` from `apps/parents-app`
 - `flutter run` from `apps/driver-mobile`
 - `npm run typecheck`
 - `npm run build`
@@ -24,6 +24,7 @@ Monorepo scaffold for the SchoolBus Bridge platform.
 This is the initial scaffold aligned with the docs in `docs/`.
 The mobile app now targets Flutter, while the backend is Node.js and Supabase-backed.
 Route planning supports both:
+
 - Manual dispatch trigger: `POST /schools/:schoolId/routes/optimize-daily`
 - Automatic nightly scheduler in API (`NIGHTLY_PLANNER_*` env vars)
 - Planner run history API: `GET /admin/planner-runs` (school admin scoped, super admin global)
@@ -67,6 +68,7 @@ Route planning supports both:
 - `RLS_OTHER_SCHOOL_ID`
 
 CI enforcement:
+
 - Staging pipeline: `.github/workflows/rls-staging.yml`
 - Seeds deterministic fixtures + tokens via:
   - `npm run -w @school-bus/api rls:seed`
@@ -77,3 +79,4 @@ CI enforcement:
 ## Additional Env (Password Reset OTP)
 
 - `PARENT_RESET_OTP_SECRET` (recommended; falls back to `STREAM_TOKEN_SECRET` if omitted)
+

@@ -3,7 +3,7 @@
 ## Platform Setup
 
 - Create npm workspaces for `apps/api`, `apps/admin-web`, and `packages/shared`
-- Create Flutter project structure in `apps/mobile`
+- Create Flutter project structure in `apps/parents-app`
 - Add environment loading strategy per app
 - Add base lint and formatting config
 
@@ -101,3 +101,4 @@
 - QR only vs QR plus manual attendance for MVP
 - Single school tenant first or multi-school SaaS from day one
 - Whether ETA depends on external maps API in MVP
+

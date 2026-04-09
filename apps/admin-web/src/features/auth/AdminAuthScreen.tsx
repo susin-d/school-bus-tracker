@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 
 import { useAdminSession } from "../../core/auth";
 
@@ -11,43 +11,56 @@ export function AdminAuthScreen() {
   } = useAdminSession();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const canSubmit = email.trim().length > 3 && password.length > 0;
 
-  async function handleSignIn() {
+  async function handleSignIn(event?: FormEvent) {
+    event?.preventDefault();
+    if (!canSubmit || isLoading) {
+      return;
+    }
     clearAuthError();
     await signInWithEmailPassword(email.trim(), password);
   }
 
   return (
-    <main className="page-shell">
-      <section className="resource-panel">
-        <h1>Admin Session Sign-in</h1>
+    <main className="page-shell auth-layout auth-layout-centered">
+      <section className="auth-panel auth-panel-form auth-panel-centered">
+        <p className="auth-form-label">Sign In</p>
+        <h2>Admin Session Login</h2>
         <p className="panel-summary">
-          Sign in with email/password through backend auth. Account must map to an `admin` or `super_admin` profile.
+          Use your official admin credentials.
         </p>
-        <div className="resource-form one-column">
+        <form className="resource-form one-column" onSubmit={handleSignIn}>
+          <label className="auth-input-label" htmlFor="admin-login-email">
+            Work Email
+          </label>
           <input
+            id="admin-login-email"
             className="resource-input"
             onChange={(event) => setEmail(event.target.value)}
-            placeholder="Email"
+            placeholder="you@school.org"
             type="email"
             value={email}
           />
+          <label className="auth-input-label" htmlFor="admin-login-password">
+            Password
+          </label>
           <input
+            id="admin-login-password"
             className="resource-input"
             onChange={(event) => setPassword(event.target.value)}
-            placeholder="Password"
+            placeholder="Enter your password"
             type="password"
             value={password}
           />
           <button
             className="resource-action"
-            disabled={isLoading}
-            onClick={handleSignIn}
-            type="button"
+            disabled={isLoading || !canSubmit}
+            type="submit"
           >
             {isLoading ? "Signing in..." : "Sign In"}
           </button>
-        </div>
+        </form>
         {authError && <p className="panel-summary error-copy">{authError}</p>}
       </section>
     </main>

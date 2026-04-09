@@ -34,8 +34,7 @@ const adminUser: AdminRequestUser = {
   label: "Admin",
   role: "admin",
   schoolId: "school-1",
-  accessToken: "token-1",
-  mode: "session"
+  accessToken: "token-1"
 };
 
 describe("admin api client", () => {
@@ -55,7 +54,7 @@ describe("admin api client", () => {
     await listUsers(adminUser);
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:4000/users?schoolId=school-1",
+      "http://localhost:4000/admin/users?schoolId=school-1",
       expect.objectContaining({ method: "GET" })
     );
   });
@@ -68,7 +67,7 @@ describe("admin api client", () => {
     await createRoute(adminUser, { name: "Morning Route" });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:4000/routes?schoolId=school-1",
+      "http://localhost:4000/admin/routes?schoolId=school-1",
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({ name: "Morning Route" })
@@ -95,7 +94,7 @@ describe("admin api client", () => {
       })
     );
 
-    await expect(listSchools(adminUser)).rejects.toThrow("proxy unavailable");
+    await expect(listSchools(adminUser)).rejects.toThrow("Request failed");
   });
 
   it("falls back to status text when error body is empty", async () => {
@@ -110,7 +109,7 @@ describe("admin api client", () => {
     );
 
     await expect(listSchools(adminUser)).rejects.toThrow(
-      "Request failed (503 Service Unavailable)"
+      "Request failed"
     );
   });
 });

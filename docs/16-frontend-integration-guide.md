@@ -9,7 +9,7 @@ Keep all frontend apps role-safe and backend-driven for auth, data, and realtime
 - `apps/admin-web`
   - role: `admin`, `super_admin`
   - auth via backend (`/auth/email-login`)
-- `apps/mobile`
+- `apps/parents-app`
   - role: `parent`
   - parent-safe endpoints only
 - `apps/driver-mobile`
@@ -56,7 +56,7 @@ Keep all frontend apps role-safe and backend-driven for auth, data, and realtime
 - Admin web typecheck:
   - `npm run -w @school-bus/admin-web typecheck`
 - Parent app:
-  - `flutter analyze` and `flutter test` in `apps/mobile`
+  - `flutter analyze` and `flutter test` in `apps/parents-app`
 - Driver app:
   - `flutter analyze` and `flutter test` in `apps/driver-mobile`
 - API contracts:
@@ -67,3 +67,4 @@ Keep all frontend apps role-safe and backend-driven for auth, data, and realtime
 - Update `packages/shared` types first when API payload changes.
 - Keep frontend endpoint maps aligned with backend role guards.
 - Re-run integration tests after any role or scope change.
+

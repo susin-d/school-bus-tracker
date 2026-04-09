@@ -4,7 +4,7 @@
 
 - `apps/api` - Node.js + Express + TypeScript backend (business logic, role enforcement, integrations)
 - `apps/admin-web` - React web app for school admin and super admin
-- `apps/mobile` - Flutter parent app
+- `apps/parents-app` - Flutter parent app
 - `apps/driver-mobile` - Flutter driver app
 - `packages/shared` - shared TS contracts and domain types
 - `supabase/` - SQL migrations and RLS policies
@@ -57,3 +57,4 @@
   - `major_delay`
   - `breakdown`
   - `reassignment`
+

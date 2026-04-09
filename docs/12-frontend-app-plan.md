@@ -64,7 +64,7 @@ Note: both web roles run inside the same `apps/admin-web` codebase with route gu
 ### Flutter Parent App
 
 ```text
-apps/mobile/lib/
+apps/parents-app/lib/
   core/
     api_access.dart
     app_scope.dart
@@ -153,3 +153,4 @@ apps/admin-web/src/
 5. School admin resources: students, buses, routes, alerts, leave requests
 6. Super admin global dashboard and schools/users management
 7. Realtime updates and production polish
+

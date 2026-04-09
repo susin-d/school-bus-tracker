@@ -6,6 +6,8 @@ type SchoolPlannerRow = {
   timezone: string | null;
 };
 
+const requiredPlannerEnvVars = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"];
+
 function readBooleanEnv(name: string, defaultValue: boolean) {
   const raw = process.env[name];
   if (!raw) {
@@ -67,15 +69,33 @@ function getLocalDateParts(timeZone: string, now: Date) {
 }
 
 async function listSchools() {
-  const { data, error } = await getSupabaseAdminClient()
+  const client = getSupabaseAdminClient();
+
+  const { data, error } = await client
     .from("schools")
     .select("id, timezone");
 
-  if (error) {
-    throw new Error(`nightly planner school query failed: ${error.message}`);
+  if (!error) {
+    return (data ?? []) as SchoolPlannerRow[];
   }
 
-  return (data ?? []) as SchoolPlannerRow[];
+  // Backward-compatible fallback for schemas that do not have schools.timezone.
+  if (error.message.toLowerCase().includes("timezone")) {
+    const fallback = await client
+      .from("schools")
+      .select("id");
+
+    if (fallback.error) {
+      throw new Error(`nightly planner school query failed: ${fallback.error.message}`);
+    }
+
+    return ((fallback.data ?? []) as Array<{ id: string }>).map((row) => ({
+      id: row.id,
+      timezone: null
+    }));
+  }
+
+  throw new Error(`nightly planner school query failed: ${error.message}`);
 }
 
 export async function recordPlannerRun(input: {
@@ -210,6 +230,14 @@ export function startNightlyPlanner() {
   const enabled = readBooleanEnv("NIGHTLY_PLANNER_ENABLED", true);
   if (!enabled) {
     console.log("[nightly-planner] disabled by NIGHTLY_PLANNER_ENABLED");
+    return () => {};
+  }
+
+  const missingEnvVars = requiredPlannerEnvVars.filter((name) => !process.env[name]);
+  if (missingEnvVars.length > 0) {
+    console.warn(
+      `[nightly-planner] skipped (missing required env vars: ${missingEnvVars.join(", ")})`
+    );
     return () => {};
   }
 
