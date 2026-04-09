@@ -17,35 +17,13 @@ export type AdminRouteKey =
   | "alerts"
   | "leaveRequests";
 
-export type AdminPreviewUser = {
-  id: string;
-  label: string;
-  role: Extract<Role, "admin" | "super_admin">;
-  schoolId?: string;
-};
-
 export type AdminRequestUser = {
   id: string;
   label: string;
   role: Extract<Role, "admin" | "super_admin">;
   schoolId?: string;
   accessToken?: string;
-  mode: "preview" | "session";
 };
-
-export const previewUsers: AdminPreviewUser[] = [
-  {
-    id: "admin-1",
-    label: "Greenfield School Admin",
-    role: "admin",
-    schoolId: "school-1"
-  },
-  {
-    id: "super-1",
-    label: "Platform Super Admin",
-    role: "super_admin"
-  }
-];
 
 export const routeLabels: Record<AdminRouteKey, string> = {
   landing: "Landing",

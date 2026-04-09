@@ -336,9 +336,23 @@ button {
 }
 
 @media (max-width: 900px) {
+  .landing-topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .landing-actions {
+    width: 100%;
+  }
+
+  .landing-actions > button {
+    flex: 1;
+  }
+
   .resource-form {
     grid-template-columns: 1fr;
   }
 }
+
 
 

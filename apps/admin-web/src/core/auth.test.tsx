@@ -6,17 +6,14 @@ import { AdminSessionProvider, useAdminSession } from "./auth";
 function SessionProbe() {
   const {
     currentUser,
-    mode,
     signInWithEmailPassword,
     signOutSession,
     authError,
-    clearAuthError,
-    setMode
+    clearAuthError
   } = useAdminSession();
 
   return (
     <div>
-      <div data-testid="mode">{mode}</div>
       <div data-testid="user">{currentUser?.id ?? "none"}</div>
       <div data-testid="error">{authError ?? ""}</div>
       <button
@@ -43,9 +40,6 @@ function SessionProbe() {
       >
         clear-error
       </button>
-      <button onClick={() => setMode("preview")} type="button">
-        preview-mode
-      </button>
     </div>
   );
 }
@@ -66,15 +60,14 @@ describe("AdminSessionProvider", () => {
     vi.restoreAllMocks();
   });
 
-  it("starts in preview mode with preview user", () => {
+  it("starts without a demo user", () => {
     render(
       <AdminSessionProvider>
         <SessionProbe />
       </AdminSessionProvider>
     );
 
-    expect(screen.getByTestId("mode")).toHaveTextContent("preview");
-    expect(screen.getByTestId("user")).toHaveTextContent("admin-1");
+    expect(screen.getByTestId("user")).toHaveTextContent("none");
   });
 
   it("signs in and loads a session admin", async () => {
@@ -110,7 +103,6 @@ describe("AdminSessionProvider", () => {
     fireEvent.click(screen.getByRole("button", { name: "login" }));
 
     await waitFor(() => {
-      expect(screen.getByTestId("mode")).toHaveTextContent("session");
       expect(screen.getByTestId("user")).toHaveTextContent("admin-9");
     });
   });
@@ -140,7 +132,7 @@ describe("AdminSessionProvider", () => {
       expect(screen.getByTestId("error")).toHaveTextContent(
         "This account is not allowed in admin web"
       );
-      expect(screen.getByTestId("mode")).toHaveTextContent("preview");
+      expect(screen.getByTestId("user")).toHaveTextContent("none");
     });
 
     fireEvent.click(screen.getByRole("button", { name: "clear-error" }));
@@ -182,7 +174,7 @@ describe("AdminSessionProvider", () => {
     fireEvent.click(screen.getByRole("button", { name: "login" }));
 
     await waitFor(() => {
-      expect(screen.getByTestId("mode")).toHaveTextContent("session");
+      expect(screen.getByTestId("user")).toHaveTextContent("admin-9");
     });
 
     fireEvent.click(screen.getByRole("button", { name: "logout" }));

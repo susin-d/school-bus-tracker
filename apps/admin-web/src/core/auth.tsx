@@ -1,24 +1,17 @@
 import {
   createContext,
   useContext,
-  useEffect,
   useMemo,
   useState,
   type PropsWithChildren
 } from "react";
 import type { UserProfile } from "@school-bus/shared";
 
-import {
-  previewUsers,
-  type AdminRequestUser
-} from "./roleAccess";
+import type { AdminRequestUser } from "./roleAccess";
 import { getApiBaseUrl } from "./api";
 
 type AdminSessionContextValue = {
   currentUser: AdminRequestUser | null;
-  mode: "preview" | "session";
-  setCurrentUserById: (userId: string) => void;
-  setMode: (mode: "preview" | "session") => void;
   signInWithEmailPassword: (email: string, password: string) => Promise<void>;
   signOutSession: () => Promise<void>;
   authError: string | null;
@@ -29,32 +22,11 @@ type AdminSessionContextValue = {
 const AdminSessionContext = createContext<AdminSessionContextValue | null>(null);
 
 export function AdminSessionProvider({ children }: PropsWithChildren) {
-  const [mode, setModeState] = useState<"preview" | "session">("preview");
-  const [currentUserId, setCurrentUserId] = useState(previewUsers[0]!.id);
   const [sessionUser, setSessionUser] = useState<AdminRequestUser | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const previewUser = useMemo(
-    () => previewUsers.find((candidate) => candidate.id === currentUserId) ?? previewUsers[0]!,
-    [currentUserId]
-  );
-
-  useEffect(() => {
-    if (mode === "preview") {
-      setAuthError(null);
-    }
-  }, [mode]);
-
   const value = useMemo<AdminSessionContextValue>(() => {
-    const currentUser: AdminRequestUser | null =
-      mode === "preview"
-        ? {
-            ...previewUser,
-            mode: "preview"
-          }
-        : sessionUser;
-
     async function signInWithEmailPassword(email: string, password: string) {
       setIsLoading(true);
       setAuthError(null);
@@ -117,10 +89,8 @@ export function AdminSessionProvider({ children }: PropsWithChildren) {
           label: user.fullName,
           role: user.role,
           schoolId: user.schoolId,
-          accessToken,
-          mode: "session"
+          accessToken
         });
-        setModeState("session");
       } catch (error) {
         setSessionUser(null);
         setAuthError(error instanceof Error ? error.message : "Sign-in failed");
@@ -145,17 +115,14 @@ export function AdminSessionProvider({ children }: PropsWithChildren) {
     }
 
     return {
-      currentUser,
-      mode,
-      setCurrentUserById: setCurrentUserId,
-      setMode: setModeState,
+      currentUser: sessionUser,
       signInWithEmailPassword,
       signOutSession,
       authError,
       clearAuthError: () => setAuthError(null),
       isLoading
     };
-  }, [authError, isLoading, mode, previewUser, sessionUser]);
+  }, [authError, isLoading, sessionUser]);
 
   return (
     <AdminSessionContext.Provider value={value}>

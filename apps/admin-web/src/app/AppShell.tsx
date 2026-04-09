@@ -4,7 +4,6 @@ import { useAdminSession } from "../core/auth";
 import { useAdminRouter } from "../core/router";
 import {
   getAllowedRoutes,
-  previewUsers,
   routeLabels,
   type AdminRouteKey
 } from "../core/roleAccess";
@@ -21,13 +20,7 @@ export function AppShell({
   activeRoute,
   children
 }: AppShellProps) {
-  const {
-    currentUser,
-    mode,
-    setMode,
-    setCurrentUserById,
-    signOutSession
-  } = useAdminSession();
+  const { currentUser, signOutSession } = useAdminSession();
   const { navigate } = useAdminRouter();
 
   if (!currentUser) {
@@ -47,45 +40,10 @@ export function AppShell({
           <p className="eyebrow">SchoolBus Bridge</p>
           <h1>{title}</h1>
           <p className="lede">{subtitle}</p>
-          <div className="role-toggle" aria-label="Admin role preview">
-            <label className="role-select-label" htmlFor="admin-auth-mode">
-              Mode
-            </label>
-            <select
-              id="admin-auth-mode"
-              className="role-select"
-              onChange={(event) => setMode(event.target.value as "preview" | "session")}
-              value={mode}
-            >
-              <option value="preview">Preview</option>
-              <option value="session">Backend Session</option>
-            </select>
-
-            {mode === "preview" && (
-              <>
-                <label className="role-select-label" htmlFor="admin-preview-user">
-                  Preview User
-                </label>
-                <select
-                  id="admin-preview-user"
-                  className="role-select"
-                  onChange={(event) => setCurrentUserById(event.target.value)}
-                  value={currentUser.id}
-                >
-                  {previewUsers.map((previewUser) => (
-                    <option key={previewUser.id} value={previewUser.id}>
-                      {previewUser.label}
-                    </option>
-                  ))}
-                </select>
-              </>
-            )}
-
-            {mode === "session" && (
-              <button className="resource-danger" onClick={() => void signOutSession()} type="button">
-                Sign Out
-              </button>
-            )}
+          <div className="role-toggle" aria-label="Admin session controls">
+            <button className="resource-danger" onClick={() => void signOutSession()} type="button">
+              Sign Out
+            </button>
           </div>
         </div>
 
@@ -98,7 +56,7 @@ export function AppShell({
             <li>Super admin web app</li>
           </ul>
           <p className="panel-note">
-            The admin web now previews school-scoped and global roles through one routed shell.
+            Unified admin operations for school-scoped and global roles.
           </p>
         </aside>
       </section>
