@@ -73,37 +73,47 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 SingleChildScrollView(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
                   child: ConstrainedBox(
                     constraints:
-                        BoxConstraints(minHeight: constraints.maxHeight - 48),
+                        BoxConstraints(minHeight: constraints.maxHeight),
                     child: Center(
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 560),
                         child: Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(22),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildIntroPanel(theme),
-                                const SizedBox(height: 16),
-                                if (_errorMessage != null) ...[
-                                  _buildMessageBanner(theme),
-                                  const SizedBox(height: 14),
-                                ],
-                                _buildLoginForm(theme),
-                                const SizedBox(height: 10),
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: TextButton(
-                                    onPressed:
-                                        _busy ? null : _openForgotPassword,
-                                    child: const Text('Forgot password?'),
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                                minHeight: constraints.maxHeight - 20),
+                            child: Padding(
+                              padding: const EdgeInsets.all(22),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'SchoolBus Bridge',
+                                    style: theme.textTheme.titleLarge?.copyWith(
+                                      color: colorScheme.primary,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(height: 18),
+                                  if (_errorMessage != null) ...[
+                                    _buildMessageBanner(theme),
+                                    const SizedBox(height: 14),
+                                  ],
+                                  _buildLoginForm(theme),
+                                  const SizedBox(height: 10),
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: TextButton(
+                                      onPressed:
+                                          _busy ? null : _openForgotPassword,
+                                      child: const Text('Forgot password?'),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
@@ -126,58 +136,6 @@ class _LoginScreenState extends State<LoginScreen> {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: color,
-      ),
-    );
-  }
-
-  Widget _buildIntroPanel(ThemeData theme) {
-    final colorScheme = theme.colorScheme;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            colorScheme.primaryContainer.withValues(alpha: 0.85),
-            colorScheme.secondaryContainer.withValues(alpha: 0.8),
-          ],
-        ),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.55),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: colorScheme.surface.withValues(alpha: 0.8),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  Icons.lock_outline_rounded,
-                  size: 18,
-                  color: colorScheme.primary,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                'SchoolBus Bridge',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: colorScheme.primary,
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }

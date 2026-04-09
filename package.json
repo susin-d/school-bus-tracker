@@ -13,7 +13,8 @@
     "dev": "npm run -w @school-bus/api dev",
     "dev:api": "npm run -w @school-bus/api dev",
     "dev:admin": "npm run -w @school-bus/admin-web dev",
-    "dev:mobile": "flutter run -d chrome apps/parents-app/lib/main.dart",
+    "dev:mobile": "flutter run -d chrome --dart-define-from-file=apps/parents-app/.env apps/parents-app/lib/main.dart",
+    "scan:wiring": "node scripts/scan-wiring.mjs",
     "lint": "npm run --workspaces lint",
     "start": "npm run -w @school-bus/api start",
     "typecheck": "npm run --workspaces typecheck"

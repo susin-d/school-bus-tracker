@@ -6,11 +6,24 @@ class ApiClient {
     required this.userId,
     this.accessToken,
     String? baseUrl,
-  }) : _baseUrl = (baseUrl ?? const String.fromEnvironment('API_BASE_URL', defaultValue: 'http://localhost:4000')).replaceAll(RegExp(r'/$'), '');
+  }) : _baseUrl = _resolveBaseUrl(baseUrl).replaceAll(RegExp(r'/$'), '');
 
   final String userId;
   final String? accessToken;
   final String _baseUrl;
+
+  static String _resolveBaseUrl(String? baseUrl) {
+    final explicit = (baseUrl ?? const String.fromEnvironment('API_BASE_URL', defaultValue: '')).trim();
+    if (explicit.isNotEmpty) {
+      return explicit;
+    }
+
+    // Android emulator cannot reach host machine via localhost.
+    if (Platform.isAndroid) {
+      return 'http://10.0.2.2:4000';
+    }
+    return 'http://localhost:4000';
+  }
 
   Future<dynamic> get(String path) async {
     final uri = Uri.parse('$_baseUrl$path');
