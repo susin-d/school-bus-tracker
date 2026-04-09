@@ -67,7 +67,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   top: -40,
                   right: -20,
                   child: _buildGlowCircle(
-                    colorScheme.secondaryContainer.withValues(alpha: 0.75),
+                    colorScheme.primaryContainer.withValues(alpha: 0.45),
                     140,
                   ),
                 ),
@@ -75,7 +75,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   bottom: 60,
                   left: -35,
                   child: _buildGlowCircle(
-                    colorScheme.primaryContainer.withValues(alpha: 0.65),
+                    colorScheme.secondaryContainer.withValues(alpha: 0.4),
                     120,
                   ),
                 ),
@@ -165,21 +165,43 @@ class _LoginScreenState extends State<LoginScreen> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            colorScheme.primaryContainer,
-            colorScheme.secondaryContainer,
+            colorScheme.primaryContainer.withValues(alpha: 0.85),
+            colorScheme.secondaryContainer.withValues(alpha: 0.8),
           ],
+        ),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.55),
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'SchoolBus Bridge',
-            style: theme.textTheme.labelLarge?.copyWith(
-              color: colorScheme.primary,
-            ),
+          Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: colorScheme.surface.withValues(alpha: 0.8),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.lock_outline_rounded,
+                  size: 18,
+                  color: colorScheme.primary,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'SchoolBus Bridge',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: colorScheme.primary,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 12),
           Text(
             'Parent Login',
             style: theme.textTheme.headlineSmall?.copyWith(
@@ -188,17 +210,26 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Track routes, attendance, leave requests, and alerts in one secure place.',
+            'Sign in securely to access student tracking, attendance updates, and school alerts.',
             style: theme.textTheme.bodyMedium,
           ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: const [
-              _QuickPill(label: 'Live ETA'),
-              _QuickPill(label: 'Attendance'),
-              _QuickPill(label: 'Alerts'),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Icon(
+                Icons.verified_user_outlined,
+                size: 16,
+                color: colorScheme.primary,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Role-based access with protected parent data',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
             ],
           ),
         ],
