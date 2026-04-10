@@ -3,7 +3,6 @@ import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-import '../../core/api_access.dart';
 import '../../core/api_client.dart';
 import '../../core/app_scope.dart';
 import 'parent_api.dart';
@@ -141,16 +140,6 @@ class _HomeTab extends StatelessWidget {
                 body: 'Location unavailable while offline.',
                 icon: Icons.location_on_outlined,
               ),
-              const SizedBox(height: 14),
-              const _EndpointList(endpoints: [
-                AppApiEndpoint.currentTrip,
-                AppApiEndpoint.tripLocation,
-                AppApiEndpoint.studentAttendanceHistory,
-                AppApiEndpoint.leaveRequests,
-                AppApiEndpoint.alertSos,
-                AppApiEndpoint.notificationsFeed,
-                AppApiEndpoint.profile,
-              ]),
             ],
           );
         }
@@ -167,7 +156,7 @@ class _HomeTab extends StatelessWidget {
           children: [
             _HeroCard(
               title: 'Welcome, $fullName',
-              subtitle: 'Route $routeName • $tripStatus',
+              subtitle: 'Route $routeName | $tripStatus',
               icon: Icons.family_restroom_outlined,
             ),
             const SizedBox(height: 12),
@@ -221,9 +210,6 @@ class _HomeTab extends StatelessWidget {
                   );
                 },
               ),
-            const SizedBox(height: 14),
-            _EndpointList(
-                endpoints: RoleApiAccess.allowedEndpoints(AppRole.parent)),
           ],
         );
       },
@@ -373,7 +359,7 @@ class _TrackingTabState extends State<_TrackingTab> {
                           ? const _InfoCard(
                               title: 'Map preview',
                               body:
-                                  'Google Map is disabled during widget tests.',
+                                  'Map preview is not available in this mode.',
                               icon: Icons.map_outlined,
                             )
                           : GoogleMap(
@@ -933,41 +919,6 @@ class _InfoCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(body, style: theme.textTheme.bodyLarge),
                 ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _EndpointList extends StatelessWidget {
-  const _EndpointList({
-    required this.endpoints,
-  });
-
-  final List<AppApiEndpoint> endpoints;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Allowed API access',
-              style: theme.textTheme.titleLarge?.copyWith(fontSize: 18),
-            ),
-            const SizedBox(height: 8),
-            ...endpoints.map(
-              (endpoint) => Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Text(endpoint.label, style: theme.textTheme.bodyMedium),
               ),
             ),
           ],

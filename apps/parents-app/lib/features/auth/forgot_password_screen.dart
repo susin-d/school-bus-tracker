@@ -16,9 +16,6 @@ class ForgotPasswordScreen extends StatefulWidget {
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _redirectController = TextEditingController(
-    text: const String.fromEnvironment('AUTH_REDIRECT_URL', defaultValue: ''),
-  );
   late final TextEditingController _emailController;
   final _authApi = AuthApi();
 
@@ -35,7 +32,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   void dispose() {
     _emailController.dispose();
-    _redirectController.dispose();
     super.dispose();
   }
 
@@ -111,18 +107,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                       border: OutlineInputBorder(),
                                     ),
                                   ),
-                                  const SizedBox(height: 10),
-                                  TextFormField(
-                                    controller: _redirectController,
-                                    textInputAction: TextInputAction.done,
-                                    enabled: !_busy,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Redirect URL (optional)',
-                                      hintText:
-                                          'https://app.example.com/auth/callback',
-                                      border: OutlineInputBorder(),
-                                    ),
-                                  ),
                                   const SizedBox(height: 14),
                                   SizedBox(
                                     width: double.infinity,
@@ -188,7 +172,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     }
 
     final email = _emailController.text.trim();
-    final redirect = _redirectController.text.trim();
+    final redirect =
+        const String.fromEnvironment('AUTH_REDIRECT_URL', defaultValue: '')
+            .trim();
 
     setState(() {
       _busy = true;
