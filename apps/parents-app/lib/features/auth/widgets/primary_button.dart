@@ -39,7 +39,7 @@ class _PrimaryButtonState extends State<PrimaryButton> {
           child: FilledButton(
             style: FilledButton.styleFrom(
               elevation: enabled ? 2 : 0,
-              shadowColor: Colors.black.withValues(alpha: 0.18),
+              shadowColor: Theme.of(context).shadowColor.withValues(alpha: 0.18),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
               ),

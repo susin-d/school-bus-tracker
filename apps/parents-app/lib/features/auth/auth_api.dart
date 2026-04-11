@@ -16,12 +16,12 @@ class AuthApi {
     });
   }
 
-  Future<VerifiedSession> signInWithEmailPassword({
+  Future<VerifiedSession> signInWithCredentials({
     required String email,
     required String password,
   }) async {
     final payload = await _client.post('/auth/email-login', {
-      'email': email,
+      'email': email.trim(),
       'password': password,
     }) as Map<String, dynamic>;
 

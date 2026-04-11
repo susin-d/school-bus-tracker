@@ -81,9 +81,9 @@ class _LoginScreenState extends State<LoginScreen>
                                 .withValues(alpha: 0.42),
                             theme.scaffoldBackgroundColor,
                           ]
-                        : const [
-                            Color(0xFFF8F9FB),
-                            Color(0xFFFDFEFE),
+                        : [
+                            theme.scaffoldBackgroundColor,
+                            colorScheme.surface,
                           ],
                   ),
                 ),
@@ -197,7 +197,7 @@ class _LoginScreenState extends State<LoginScreen>
             ),
             const SizedBox(height: 16),
             Text(
-              'Welcome Back',
+              'Parent Login',
               style: theme.textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.w800,
                 color: theme.colorScheme.onSurface,
@@ -205,14 +205,14 @@ class _LoginScreenState extends State<LoginScreen>
             ),
             const SizedBox(height: 8),
             Text(
-              'Sign in to continue',
+              'Sign in to your parent account',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 4),
             Text(
-              'SURAKSHA',
+              'SURAKSHA PARENT PORTAL',
               style: theme.textTheme.labelLarge?.copyWith(
                 letterSpacing: 0.6,
                 color: theme.colorScheme.primary,
@@ -234,9 +234,9 @@ class _LoginScreenState extends State<LoginScreen>
               autofillHints: const [AutofillHints.email],
               enabled: !_busy,
               validator: _validateEmail,
-              label: 'Email',
-              hint: 'parent@school.com',
-              prefixIcon: Icons.mail_rounded,
+              label: 'Email Address',
+              hint: 'e.g. parent@example.com',
+              prefixIcon: Icons.email_outlined,
               onFieldSubmitted: (_) {
                 FocusScope.of(context).requestFocus(_passwordFocusNode);
               },
@@ -247,17 +247,18 @@ class _LoginScreenState extends State<LoginScreen>
               focusNode: _passwordFocusNode,
               obscureText: _obscurePassword,
               textInputAction: TextInputAction.done,
+              keyboardType: TextInputType.visiblePassword,
               autofillHints: const [AutofillHints.password],
               enabled: !_busy,
               validator: _validatePassword,
               onFieldSubmitted: (_) {
                 if (!_busy) {
-                  _handleEmailPasswordLogin();
+                  _handleLogin();
                 }
               },
               label: 'Password',
               hint: 'Enter your password',
-              prefixIcon: Icons.lock_rounded,
+              prefixIcon: Icons.lock_outline_rounded,
               suffix: IconButton(
                 tooltip: _obscurePassword ? 'Show password' : 'Hide password',
                 onPressed: _busy
@@ -274,7 +275,7 @@ class _LoginScreenState extends State<LoginScreen>
                 ),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
             Row(
               children: [
                 Expanded(
@@ -294,23 +295,32 @@ class _LoginScreenState extends State<LoginScreen>
                   ),
                 ),
                 TextButton(
-                  onPressed: _busy ? null : _openForgotPassword,
-                  child: const Text('Forgot password?'),
+                  onPressed: _busy
+                      ? null
+                      : () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const ForgotPasswordScreen(),
+                            ),
+                          );
+                        },
+                  child: const Text('Forgot Password?'),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
             PrimaryButton(
-              text: 'Sign In',
+              text: 'Login',
               loadingText: 'Signing in...',
               busy: _busy,
-              onPressed: _handleEmailPasswordLogin,
+              onPressed: _handleLogin,
             ),
             const SizedBox(height: 6),
             Semantics(
               liveRegion: true,
               child: Text(
-                _busy ? 'Signing in. Please wait.' : '',
+                _busy ? 'Logging in. Please wait.' : '',
                 style: theme.textTheme.bodySmall,
               ),
             ),
@@ -327,23 +337,23 @@ class _LoginScreenState extends State<LoginScreen>
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFFFF6B6B).withValues(alpha: 0.12),
+        color: theme.colorScheme.error.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: const Color(0xFFFF6B6B).withValues(alpha: 0.35),
+          color: theme.colorScheme.error.withValues(alpha: 0.35),
         ),
       ),
       child: Text(
         content,
         style: theme.textTheme.bodyMedium?.copyWith(
-          color: const Color(0xFFC93A3A),
+          color: theme.colorScheme.error,
           fontWeight: FontWeight.w500,
         ),
       ),
     );
   }
 
-  Future<void> _handleEmailPasswordLogin() async {
+  Future<void> _handleLogin() async {
     FocusScope.of(context).unfocus();
     if (!_formKey.currentState!.validate()) {
       return;
@@ -351,9 +361,9 @@ class _LoginScreenState extends State<LoginScreen>
 
     final email = _emailController.text.trim();
     final password = _passwordController.text;
-
+ 
     await _runAsync(() async {
-      final session = await _authApi.signInWithEmailPassword(
+      final session = await _authApi.signInWithCredentials(
         email: email,
         password: password,
       );
@@ -367,15 +377,6 @@ class _LoginScreenState extends State<LoginScreen>
         accessToken: session.token,
       );
     });
-  }
-
-  Future<void> _openForgotPassword() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) =>
-            ForgotPasswordScreen(initialEmail: _emailController.text.trim()),
-      ),
-    );
   }
 
   Future<void> _runAsync(Future<void> Function() action) async {
@@ -399,22 +400,18 @@ class _LoginScreenState extends State<LoginScreen>
   String? _validateEmail(String? value) {
     final email = (value ?? '').trim();
     if (email.isEmpty) {
-      return 'Email is required';
+      return 'Email address is required';
     }
     final emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
     if (!emailRegex.hasMatch(email)) {
-      return 'Enter a valid email address';
+      return 'Please enter a valid email address';
     }
     return null;
   }
-
+ 
   String? _validatePassword(String? value) {
-    final password = (value ?? '').trim();
-    if (password.isEmpty) {
+    if ((value ?? '').trim().isEmpty) {
       return 'Password is required';
-    }
-    if (password.length < 8) {
-      return 'Must be at least 8 characters';
     }
     return null;
   }
@@ -430,6 +427,9 @@ class _LoginScreenState extends State<LoginScreen>
 
   String _readableError(Object error) {
     final raw = error.toString();
+    if (raw.contains('Invalid login credentials')) {
+      return 'Invalid email or password.';
+    }
     if (raw.startsWith('HttpException: ')) {
       return raw.replaceFirst('HttpException: ', '');
     }

@@ -144,6 +144,17 @@ class DriverApi {
     return payload;
   }
 
+  Future<Map<String, dynamic>> updateStopStatus({
+    required String tripId,
+    required String stopId,
+    required String status,
+  }) async {
+    final payload = await _client.post('/trips/$tripId/stops/$stopId/status', {
+      'status': status
+    }) as Map<String, dynamic>;
+    return payload;
+  }
+
   Future<Map<String, dynamic>> getProfile() async {
     final payload = await _client.get('/auth/me') as Map<String, dynamic>;
     return (payload['user'] as Map<String, dynamic>? ?? const <String, dynamic>{});

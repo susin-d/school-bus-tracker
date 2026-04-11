@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:table_calendar/table_calendar.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../core/api_client.dart';
 import '../../core/app_scope.dart';
+import '../../core/marker_generator.dart';
 import 'parent_api.dart';
+import 'widgets/permission_guard.dart';
 
 class ParentHomeScreen extends StatefulWidget {
   const ParentHomeScreen({super.key});
@@ -14,15 +17,28 @@ class ParentHomeScreen extends StatefulWidget {
 }
 
 class _ParentHomeScreenState extends State<ParentHomeScreen> {
-  int _tabIndex = 0;
-  static const _tabTitles = <String>[
-    'Overview',
-    'Live Tracking',
-    'Attendance',
-    'Leave',
-    'Alerts',
-    'Profile',
-  ];
+  BitmapDescriptor? _busIcon;
+  BitmapDescriptor? _schoolIcon;
+  BitmapDescriptor? _homeIcon;
+
+  @override
+  void initState() {
+    super.initState();
+    _initIcons();
+  }
+
+  Future<void> _initIcons() async {
+    final bus = await MarkerGenerator.createMarkerFromEmoji('🚍');
+    final school = await MarkerGenerator.createMarkerFromEmoji('🏫');
+    final home = await MarkerGenerator.createMarkerFromEmoji('🏠');
+    if (mounted) {
+      setState(() {
+        _busIcon = bus;
+        _schoolIcon = school;
+        _homeIcon = home;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -30,192 +46,366 @@ class _ParentHomeScreenState extends State<ParentHomeScreen> {
     final api =
         ParentApi(ApiClient(userId: user.id, accessToken: user.accessToken));
 
-    final tabs = <Widget>[
-      _HomeTab(api: api, fullName: user.fullName),
-      _TrackingTab(api: api),
-      _AttendanceTab(api: api),
-      _LeaveTab(api: api),
-      _NotificationsTab(api: api),
-      _ProfileTab(api: api, fullName: user.fullName),
-    ];
-
     return Scaffold(
+      drawer: _buildDrawer(context),
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(_tabTitles[_tabIndex]),
-            Text(
-              user.fullName,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        ),
+        title: const Text('SURAKSHA'),
+        centerTitle: true,
         actions: [
           IconButton(
-            onPressed: () => AppScope.of(context).signOut(),
-            icon: const Icon(Icons.logout),
-            tooltip: 'Sign out',
+            onPressed: () => _showNotifications(context, api),
+            icon: const Icon(Icons.notifications_active_outlined),
           ),
         ],
       ),
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 220),
-        switchInCurve: Curves.easeOutCubic,
-        switchOutCurve: Curves.easeInCubic,
-        child: KeyedSubtree(
-          key: ValueKey<int>(_tabIndex),
-          child: tabs[_tabIndex],
+      body: FutureBuilder<Map<String, dynamic>>(
+        future: api.getCurrentTrip(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final data = snapshot.data ?? const <String, dynamic>{};
+          final students = (data['students'] as List<dynamic>? ?? const []);
+          final student = students.isNotEmpty ? students.first as Map<String, dynamic> : null;
+
+          return ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              if (student != null) _StudentHeader(student: student),
+              const SizedBox(height: 24),
+              _ModuleGrid(
+                api: api,
+                student: student,
+                busIcon: _busIcon,
+                schoolIcon: _schoolIcon,
+                homeIcon: _homeIcon,
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildDrawer(BuildContext context) {
+    return Drawer(
+      child: Column(
+        children: [
+          DrawerHeader(
+            decoration: BoxDecoration(color: theme.colorScheme.primary),
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                   CircleAvatar(
+                     radius: 30, 
+                     backgroundColor: theme.colorScheme.onPrimary, 
+                     child: Icon(Icons.person, size: 30, color: theme.colorScheme.primary),
+                   ),
+                   const SizedBox(height: 12),
+                   Text(
+                     AppScope.of(context).currentUser!.fullName, 
+                     style: theme.textTheme.titleMedium?.copyWith(
+                       color: theme.colorScheme.onPrimary, 
+                       fontWeight: FontWeight.bold,
+                     ),
+                   ),
+                ],
+              ),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.lock_outline),
+            title: const Text('Change Password'),
+            onTap: () => Navigator.pop(context),
+          ),
+          ListTile(
+            leading: const Icon(Icons.palette_outlined),
+            title: const Text('Change Theme'),
+            onTap: () => Navigator.pop(context),
+          ),
+          ListTile(
+            leading: const Icon(Icons.support_agent_outlined),
+            title: const Text('Contact Support'),
+            onTap: () => Navigator.pop(context),
+          ),
+          const Spacer(),
+          const Divider(),
+          ListTile(
+            leading: Icon(Icons.logout, color: theme.colorScheme.error),
+            title: Text('Sign Out', style: TextStyle(color: theme.colorScheme.error)),
+            onTap: () {
+              Navigator.pop(context);
+              AppScope.of(context).signOut();
+            },
+          ),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  void _showNotifications(BuildContext context, ParentApi api) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (context) => _NotificationsList(api: api),
+    );
+  }
+}
+
+class _StudentHeader extends StatelessWidget {
+  const _StudentHeader({required this.student});
+  final Map<String, dynamic> student;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Card(
+      elevation: 4,
+      shadowColor: Colors.black12,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 40,
+                  backgroundColor: theme.colorScheme.primaryContainer,
+                  child: Icon(Icons.person, size: 40, color: theme.colorScheme.primary),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        student['fullName'] ?? student['full_name'] ?? 'Student Name', 
+                        style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        'Student', 
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: theme.colorScheme.primary, 
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: 32),
+            _buildInfoGrid([
+              _InfoItem('Age', '14 Years'), // Placeholder as not in manifest
+              _InfoItem('Class & Sec', '${student['grade'] ?? student['class'] ?? '-'}'),
+              _InfoItem('Gender', 'Male'), // Placeholder
+              _InfoItem('Admission No', student['admission_no'] ?? '-'),
+              _InfoItem('Acad. Year', '2025-26'),
+              _InfoItem('Blood Group', 'O+'),
+              _InfoItem('Parent Name', 'Parent Name'),
+              _InfoItem('Parent Mob', '9876543210'),
+            ]),
+          ],
         ),
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _tabIndex,
-        onDestinationSelected: (value) => setState(() => _tabIndex = value),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Home'),
-          NavigationDestination(
-              icon: Icon(Icons.map_outlined), label: 'Tracking'),
-          NavigationDestination(
-              icon: Icon(Icons.fact_check_outlined), label: 'Attendance'),
-          NavigationDestination(
-              icon: Icon(Icons.event_note_outlined), label: 'Leave'),
-          NavigationDestination(
-              icon: Icon(Icons.notifications_none), label: 'Alerts'),
-          NavigationDestination(
-              icon: Icon(Icons.person_outline), label: 'Profile'),
-        ],
+    );
+  }
+
+  Widget _buildInfoGrid(List<Widget> children) {
+    return GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: 2,
+      childAspectRatio: 3.5,
+      children: children,
+    );
+  }
+}
+
+class _InfoItem extends StatelessWidget {
+  const _InfoItem(this.label, this.value);
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: theme.textTheme.labelSmall),
+        Text(value, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold)),
+      ],
+    );
+  }
+}
+
+class _ModuleGrid extends StatelessWidget {
+  const _ModuleGrid({
+    required this.api,
+    this.student,
+    this.busIcon,
+    this.schoolIcon,
+    this.homeIcon,
+  });
+  final ParentApi api;
+  final Map<String, dynamic>? student;
+  final BitmapDescriptor? busIcon;
+  final BitmapDescriptor? schoolIcon;
+  final BitmapDescriptor? homeIcon;
+
+  @override
+  Widget build(BuildContext context) {
+    final dashboard = DashboardTheme.of(context);
+ 
+    return GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: 2,
+      mainAxisSpacing: 16,
+      crossAxisSpacing: 16,
+      children: [
+        _ModuleTile(
+          icon: Icons.map_outlined,
+          label: 'Track Bus',
+          color: dashboard.trackBus,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => _TrackingTab(
+            api: api,
+            busIcon: busIcon,
+            schoolIcon: schoolIcon,
+            homeIcon: homeIcon,
+          ))),
+        ),
+        _ModuleTile(
+          icon: Icons.calendar_today_outlined,
+          label: 'Attendance',
+          color: dashboard.attendance,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => _AttendanceTab(api: api))),
+        ),
+        _ModuleTile(
+          icon: Icons.assignment_ind_outlined,
+          label: 'Driver Details',
+          color: dashboard.driverDetails,
+          onTap: () => _showDriverDetails(context),
+        ),
+        _ModuleTile(
+          icon: Icons.event_note_outlined,
+          label: 'Leave Request',
+          color: dashboard.leaveRequest,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => _LeaveTab(api: api))),
+        ),
+      ],
+    );
+  }
+
+  void _showDriverDetails(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Driver & Bus Info'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircleAvatar(radius: 40, backgroundColor: Colors.grey, child: Icon(Icons.person, size: 40)),
+            const SizedBox(height: 16),
+            const Text('Driver: John Doe', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text('Age: 38'),
+            const Divider(height: 32),
+            const Text('Bus No: 12'),
+            const Text('Plate: TN 01 AB 1234', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            Text(
+              'Phone calls to drivers are disabled.', 
+              style: theme.textTheme.labelSmall?.copyWith(fontStyle: FontStyle.italic),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _HomeTab extends StatelessWidget {
-  const _HomeTab({
-    required this.api,
-    required this.fullName,
-  });
-
-  final ParentApi api;
-  final String fullName;
+class _ModuleTile extends StatelessWidget {
+  const _ModuleTile({required this.icon, required this.label, required this.color, required this.onTap});
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<Map<String, dynamic>>(
-      future: api.getCurrentTrip(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const _LoadingPanel(title: 'Loading current trip');
-        }
-
-        if (snapshot.hasError) {
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-            children: [
-              _HeroCard(
-                title: 'Welcome, $fullName',
-                subtitle:
-                    'Your school updates will appear here when connectivity is restored.',
-                icon: Icons.family_restroom_outlined,
-              ),
-              const SizedBox(height: 12),
-              _InfoCard(
-                title: 'Current Trip',
-                body: 'Live trip data is currently unavailable.',
-                icon: Icons.directions_bus_filled_outlined,
-              ),
-              const SizedBox(height: 12),
-              _InfoCard(
-                title: 'Assigned Students',
-                body: 'Student assignments could not be loaded.',
-                icon: Icons.groups_2_outlined,
-              ),
-              const SizedBox(height: 12),
-              const _InfoCard(
-                title: 'Last Location',
-                body: 'Location unavailable while offline.',
-                icon: Icons.location_on_outlined,
-              ),
-            ],
-          );
-        }
-
-        final data = snapshot.data ?? const <String, dynamic>{};
-        final trip = data['trip'] as Map<String, dynamic>?;
-        final students = data['students'] as List<dynamic>? ?? const [];
-        final location = data['lastLocation'] as Map<String, dynamic>?;
-        final routeName = (trip?['routeName'] ?? '-').toString();
-        final tripStatus = (trip?['status'] ?? 'No active trip').toString();
-
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        decoration: BoxDecoration(
+          color: color.withAlpha(20),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: color.withAlpha(50)),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            _HeroCard(
-              title: 'Welcome, $fullName',
-              subtitle: 'Route $routeName | $tripStatus',
-              icon: Icons.family_restroom_outlined,
-            ),
+            Icon(icon, size: 40, color: color),
             const SizedBox(height: 12),
-            _InfoCard(
-              title: 'Current Trip',
-              body: trip == null
-                  ? 'No active trip is assigned right now.'
-                  : 'Route: ${trip['routeName'] ?? '-'} | Bus: ${trip['busLabel'] ?? '-'} | Status: ${trip['status'] ?? '-'}',
-              icon: Icons.directions_bus_filled_outlined,
-            ),
-            const SizedBox(height: 12),
-            _InfoCard(
-              title: 'Assigned Students',
-              body: students.isEmpty
-                  ? 'No student linked to an active trip.'
-                  : students
-                      .map((item) =>
-                          (item as Map<String, dynamic>)['fullName'] ?? '-')
-                      .join(', '),
-              icon: Icons.groups_2_outlined,
-            ),
-            const SizedBox(height: 12),
-            _InfoCard(
-              title: 'Last Location',
-              body: location == null
-                  ? 'Location not available.'
-                  : 'Lat: ${location['latitude']} | Lng: ${location['longitude']}',
-              icon: Icons.location_on_outlined,
-            ),
-            const SizedBox(height: 12),
-            if (students.isNotEmpty)
-              FutureBuilder<Map<String, dynamic>>(
-                future: api.getStudentLiveTrip(
-                  ((students.first as Map<String, dynamic>)['id'] ?? '')
-                      .toString(),
-                ),
-                builder: (context, liveTripSnapshot) {
-                  final liveTrip =
-                      liveTripSnapshot.data ?? const <String, dynamic>{};
-                  final eta = liveTrip['estimatedDropoffAt']?.toString();
-                  final studentStop =
-                      liveTrip['studentStop'] as Map<String, dynamic>?;
-                  final stopStatus =
-                      studentStop?['stopStatus']?.toString() ?? 'scheduled';
-                  return _InfoCard(
-                    title: 'Estimated Dropoff',
-                    body: eta == null
-                        ? 'ETA is not ready yet.'
-                        : 'ETA: $eta | Stop status: $stopStatus',
-                    icon: Icons.schedule_outlined,
-                  );
-                },
-              ),
+            Text(label, style: TextStyle(fontWeight: FontWeight.bold, color: color)),
           ],
-        );
-      },
+        ),
+      ),
+    );
+  }
+}
+
+class _NotificationsList extends StatelessWidget {
+  const _NotificationsList({required this.api});
+  final ParentApi api;
+
+  @override
+  Widget build(BuildContext context) {
+    final dashboard = DashboardTheme.of(context);
+    final theme = Theme.of(context);
+ 
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        Text('Notifications', style: theme.textTheme.titleLarge),
+        const SizedBox(height: 16),
+        _buildNotificationTile('Bus arrival alert', 'Bus is arriving at your stop in 5 mins.', dashboard.trackBus),
+        _buildNotificationTile('Delay / breakdown alert', 'Route 12 is delayed by 15 mins due to traffic.', theme.colorScheme.error),
+        _buildNotificationTile('Route change notification', 'Main road closed, diverting via bypass.', dashboard.driverDetails),
+        _buildNotificationTile('Bus reached your area', 'Bus has entered your neighborhood.', dashboard.attendance),
+        _buildNotificationTile('Bus left school', 'The afternoon trip from school has started.', dashboard.notification),
+      ],
+    );
+  }
+
+  Widget _buildNotificationTile(String title, String message, Color color) {
+    return ListTile(
+      leading: CircleAvatar(backgroundColor: color.withAlpha(20), child: Icon(Icons.notification_important, color: color)),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+      subtitle: Text(message),
+      contentPadding: const EdgeInsets.symmetric(vertical: 8),
     );
   }
 }
 
 class _TrackingTab extends StatefulWidget {
-  const _TrackingTab({required this.api});
+  const _TrackingTab({
+    required this.api,
+    this.busIcon,
+    this.schoolIcon,
+    this.homeIcon,
+  });
 
   final ParentApi api;
+  final BitmapDescriptor? busIcon;
+  final BitmapDescriptor? schoolIcon;
+  final BitmapDescriptor? homeIcon;
 
   @override
   State<_TrackingTab> createState() => _TrackingTabState();
@@ -229,12 +419,8 @@ class _TrackingTabState extends State<_TrackingTab> {
   void initState() {
     super.initState();
     _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _refreshTick += 1;
-      });
+      if (!mounted) return;
+      setState(() => _refreshTick += 1);
     });
   }
 
@@ -246,224 +432,312 @@ class _TrackingTabState extends State<_TrackingTab> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<Map<String, dynamic>>(
-      future: widget.api.getCurrentTrip(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const _LoadingPanel(title: 'Loading tracking view');
-        }
+    return Scaffold(
+      appBar: AppBar(title: const Text('Track Bus')),
+      body: FutureBuilder<Map<String, dynamic>>(
+        future: widget.api.getCurrentTrip(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) return const _LoadingPanel(title: 'Connecting to bus GPS');
+          if (snapshot.hasError) return _ErrorPanel(error: snapshot.error.toString());
 
-        if (snapshot.hasError) {
-          return _ErrorPanel(error: snapshot.error.toString());
-        }
+          final data = snapshot.data ?? const {};
+          final trip = data['trip'] as Map<String, dynamic>?;
+          final students = (data['students'] as List? ?? []);
+          if (trip == null || students.isEmpty) return const _EmptyPanel(message: 'No live trip currently active for tracking.');
 
-        final data = snapshot.data ?? const <String, dynamic>{};
-        final trip = data['trip'] as Map<String, dynamic>?;
-        final students = (data['students'] as List<dynamic>? ?? const []);
-        if (trip == null) {
-          return const _EmptyPanel(
-              message: 'No active trip available for tracking.');
-        }
+          final studentId = students.first['id'].toString();
+          return FutureBuilder<Map<String, dynamic>>(
+            key: ValueKey('live-$studentId-$_refreshTick'),
+            future: widget.api.getStudentLiveTrip(studentId),
+            builder: (context, liveSnapshot) {
+              if (liveSnapshot.connectionState != ConnectionState.done) return const _LoadingPanel(title: 'Updating location');
+              
+              final liveTrip = liveSnapshot.data ?? {};
+              final busLoc = liveTrip['busLocation'] as Map<String, dynamic>?;
+              final studentStop = liveTrip['studentStop'] as Map<String, dynamic>?;
+              final eta = liveTrip['estimatedDropoffAt']?.toString() ?? 'Calculating...';
 
-        if (students.isEmpty) {
-          return const _EmptyPanel(
-              message: 'No linked student found to calculate live ETA.');
-        }
+              final lat = (busLoc?['latitude'] as num?)?.toDouble();
+              final lng = (busLoc?['longitude'] as num?)?.toDouble();
+              final stopLat = (studentStop?['latitude'] as num?)?.toDouble();
+              final stopLng = (studentStop?['longitude'] as num?)?.toDouble();
 
-        final studentId =
-            ((students.first as Map<String, dynamic>)['id'] ?? '').toString();
-        return FutureBuilder<Map<String, dynamic>>(
-          key: ValueKey<String>('live-trip-$studentId-$_refreshTick'),
-          future: widget.api.getStudentLiveTrip(studentId),
-          builder: (context, liveSnapshot) {
-            if (liveSnapshot.connectionState != ConnectionState.done) {
-              return const _LoadingPanel(title: 'Loading live student trip');
-            }
-
-            if (liveSnapshot.hasError) {
-              return _ErrorPanel(error: liveSnapshot.error.toString());
-            }
-
-            final liveTrip = liveSnapshot.data ?? const <String, dynamic>{};
-            final busLocation =
-                liveTrip['busLocation'] as Map<String, dynamic>?;
-            final nextStop = liveTrip['nextStop'] as Map<String, dynamic>?;
-            final studentStop =
-                liveTrip['studentStop'] as Map<String, dynamic>?;
-            final latitude = (busLocation?['latitude'] as num?)?.toDouble();
-            final longitude = (busLocation?['longitude'] as num?)?.toDouble();
-            final nextStopLat = (nextStop?['latitude'] as num?)?.toDouble();
-            final nextStopLng = (nextStop?['longitude'] as num?)?.toDouble();
-            final studentStopLat =
-                (studentStop?['latitude'] as num?)?.toDouble();
-            final studentStopLng =
-                (studentStop?['longitude'] as num?)?.toDouble();
-
-            return ListView(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-              children: [
-                _InfoCard(
-                  title: 'Trip Snapshot',
-                  body: 'Route ${trip['routeName']} | Status ${trip['status']}',
-                  icon: Icons.route_outlined,
-                ),
-                const SizedBox(height: 12),
-                _InfoCard(
-                  title: 'Driver',
-                  body: '${trip['driverName'] ?? '-'}',
-                  icon: Icons.person_pin_circle_outlined,
-                ),
-                const SizedBox(height: 12),
-                _InfoCard(
-                  title: 'ETA',
-                  body: liveTrip['estimatedDropoffAt'] == null
-                      ? 'Dropoff ETA unavailable right now.'
-                      : 'Estimated dropoff at ${liveTrip['estimatedDropoffAt']}',
-                  icon: Icons.schedule_outlined,
-                ),
-                const SizedBox(height: 12),
-                _InfoCard(
-                  title: 'Live Refresh',
-                  body:
-                      'Auto-refreshing every 10 seconds for realtime ETA and location updates.',
-                  icon: Icons.sync_outlined,
-                ),
-                const SizedBox(height: 12),
-                _InfoCard(
-                  title: 'Next Stop',
-                  body: nextStop == null
-                      ? 'No upcoming stop.'
-                      : '${nextStop['studentName'] ?? nextStop['addressText'] ?? 'Stop'} | ETA ${nextStop['currentEta'] ?? nextStop['plannedEta'] ?? '-'}',
-                  icon: Icons.flag_outlined,
-                ),
-                const SizedBox(height: 12),
-                _InfoCard(
-                  title: 'Student Stop Status',
-                  body: studentStop == null
-                      ? 'No student-specific stop mapped yet.'
-                      : '${studentStop['stopStatus'] ?? 'scheduled'}',
-                  icon: Icons.badge_outlined,
-                ),
-                const SizedBox(height: 12),
-                if (latitude != null && longitude != null)
-                  SizedBox(
-                    height: 220,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: GoogleMap(
-                        initialCameraPosition: CameraPosition(
-                          target: LatLng(latitude, longitude),
-                          zoom: 14,
-                        ),
-                        myLocationButtonEnabled: false,
-                        zoomControlsEnabled: false,
-                        markers: {
-                          Marker(
-                            markerId: const MarkerId('bus'),
-                            position: LatLng(latitude, longitude),
-                            infoWindow: const InfoWindow(title: 'Bus'),
-                          ),
-                          if (nextStopLat != null && nextStopLng != null)
-                            Marker(
-                              markerId:
-                                  const MarkerId('school_next_stop'),
-                              position: LatLng(nextStopLat, nextStopLng),
-                              infoWindow:
-                                  const InfoWindow(title: 'Next Stop'),
+              return PermissionGuard(
+                child: Stack(
+                  children: [
+                    Column(
+                      children: [
+                        if (lat != null && lng != null)
+                          Expanded(
+                            child: GoogleMap(
+                              initialCameraPosition: CameraPosition(target: LatLng(lat, lng), zoom: 15),
+                              myLocationEnabled: true,
+                              markers: {
+                                Marker(markerId: const MarkerId('bus'), position: LatLng(lat, lng), icon: widget.busIcon ?? BitmapDescriptor.defaultMarker),
+                                if (stopLat != null && stopLng != null)
+                                  Marker(
+                                    markerId: const MarkerId('home'), 
+                                    position: LatLng(stopLat, stopLng), 
+                                    icon: widget.homeIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+                                  ),
+                              },
                             ),
-                          if (studentStopLat != null &&
-                              studentStopLng != null)
-                            Marker(
-                              markerId: const MarkerId('home_stop'),
-                              position:
-                                  LatLng(studentStopLat, studentStopLng),
-                              infoWindow:
-                                  const InfoWindow(title: 'Home Stop'),
-                            ),
-                        },
-                      ),
+                          )
+                        else
+                          const Expanded(child: Center(child: Text('GPS signal searching...'))),
+                        
+                        _buildTripSummaryCard(trip, eta),
+                      ],
                     ),
-                  )
-                else
-                  const _InfoCard(
-                    title: 'Map preview',
-                    body: 'Bus location is not available yet.',
-                    icon: Icons.map_outlined,
+                    _buildEtaAlertBanner(eta),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildEtaAlertBanner(String eta) {
+    return Positioned(
+      top: 16,
+      left: 16,
+      right: 16,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.primary,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [BoxShadow(color: theme.shadowColor.withValues(alpha: 0.1), blurRadius: 8)],
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.info_outline, color: theme.colorScheme.onPrimary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Live ETA: [ bus will be arriving in 5 mins ]',
+                style: TextStyle(
+                  color: theme.colorScheme.onPrimary, 
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTripSummaryCard(Map<String, dynamic> trip, String eta) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: theme.cardTheme.color,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        boxShadow: [BoxShadow(color: theme.shadowColor.withValues(alpha: 0.05), blurRadius: 10)],
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Route: ${trip['routeName']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                  Text('Bus Label: ${trip['busLabel']}', style: const TextStyle(color: Colors.grey)),
+                ],
+              ),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: DashboardTheme.of(context).attendance.withValues(alpha: 0.1), 
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'ACTIVE', 
+                  style: TextStyle(
+                    color: DashboardTheme.of(context).attendance, 
+                    fontWeight: FontWeight.bold, 
+                    fontSize: 12,
                   ),
-              ],
-            );
-          },
-        );
-      },
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 32),
+          _InfoCard(title: 'Estimated Arrival', body: 'Expected at home: $eta', icon: Icons.timer_outlined),
+        ],
+      ),
     );
   }
 }
 
-class _AttendanceTab extends StatelessWidget {
+class _AttendanceTab extends StatefulWidget {
   const _AttendanceTab({required this.api});
-
   final ParentApi api;
 
   @override
+  State<_AttendanceTab> createState() => _AttendanceTabState();
+}
+
+class _AttendanceTabState extends State<_AttendanceTab> {
+  DateTime _focusedDay = DateTime.now();
+  DateTime? _selectedDay;
+
+  // Mock persistence for demo/requirement
+  final Set<DateTime> _presentDates = {};
+  final Set<DateTime> _absentDates = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDay = _focusedDay;
+    _presentDates.add(DateUtils.dateOnly(DateTime.now()));
+  }
+
+  @override
   Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Attendance Confirmation')),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            TableCalendar(
+              firstDay: DateTime.utc(2024, 1, 1),
+              lastDay: DateTime.utc(2026, 12, 31),
+              focusedDay: _focusedDay,
+              selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+              calendarFormat: CalendarFormat.month,
+              onDaySelected: (selectedDay, focusedDay) {
+                setState(() {
+                  _selectedDay = selectedDay;
+                  _focusedDay = focusedDay;
+                });
+                _showConfirmationPopup(selectedDay);
+              },
+              calendarStyle: CalendarStyle(
+                todayDecoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.2), 
+                  shape: BoxShape.circle,
+                ),
+                selectedDecoration: BoxDecoration(
+                  color: theme.colorScheme.primary, 
+                  shape: BoxShape.circle,
+                ),
+              ),
+              calendarBuilders: CalendarBuilders(
+                defaultBuilder: (context, day, focusedDay) {
+                  final dateOnly = DateUtils.dateOnly(day);
+                  final dashboard = DashboardTheme.of(context);
+                  if (_presentDates.contains(dateOnly)) {
+                    return _buildDayBox(day, dashboard.attendance);
+                  }
+                  if (_absentDates.contains(dateOnly)) {
+                    return _buildDayBox(day, theme.colorScheme.error);
+                  }
+                  return null;
+                },
+              ),
+            ),
+            const Divider(height: 32),
+            _buildPastEventsList(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDayBox(DateTime day, Color color) {
+    return Container(
+      margin: const EdgeInsets.all(4),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      child: Text(
+        '${day.day}', 
+        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
+  void _showConfirmationPopup(DateTime day) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Attendance'),
+        content: Text('Is your child coming today (${day.day}/${day.month})?'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              setState(() {
+                _absentDates.add(DateUtils.dateOnly(day));
+                _presentDates.remove(DateUtils.dateOnly(day));
+              });
+              Navigator.pop(context);
+            },
+            child: Text('NO', style: TextStyle(color: theme.colorScheme.error)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                _presentDates.add(DateUtils.dateOnly(day));
+                _absentDates.remove(DateUtils.dateOnly(day));
+              });
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: DashboardTheme.of(context).attendance,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('YES'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPastEventsList() {
     return FutureBuilder<Map<String, dynamic>>(
-      future: api.getCurrentTrip(),
+      future: widget.api.getCurrentTrip(),
       builder: (context, tripSnapshot) {
-        if (tripSnapshot.connectionState != ConnectionState.done) {
-          return const _LoadingPanel(title: 'Loading attendance history');
-        }
+        final students = (tripSnapshot.data?['students'] as List<dynamic>? ?? const []);
+        if (students.isEmpty) return const SizedBox.shrink();
 
-        if (tripSnapshot.hasError) {
-          return _ErrorPanel(error: tripSnapshot.error.toString());
-        }
-
-        final students =
-            (tripSnapshot.data?['students'] as List<dynamic>? ?? const []);
-        if (students.isEmpty) {
-          return const _EmptyPanel(
-              message: 'No linked student found for attendance history.');
-        }
-
-        final firstStudent = students.first as Map<String, dynamic>;
-        final studentId = (firstStudent['id'] ?? '').toString();
-        final studentName = (firstStudent['fullName'] ?? 'Student').toString();
+        final studentId = (students.first as Map<String, dynamic>)['id'].toString();
 
         return FutureBuilder<List<dynamic>>(
-          future: api.getAttendanceHistory(studentId),
+          future: widget.api.getAttendanceHistory(studentId),
           builder: (context, historySnapshot) {
-            if (historySnapshot.connectionState != ConnectionState.done) {
-              return const _LoadingPanel(title: 'Loading student events');
-            }
+            final history = historySnapshot.data ?? [];
+            if (history.isEmpty) return const Padding(padding: EdgeInsets.all(20), child: Text('No past boarding events found.'));
 
-            if (historySnapshot.hasError) {
-              return _ErrorPanel(error: historySnapshot.error.toString());
-            }
-
-            final history = historySnapshot.data ?? const [];
-            return ListView(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _InfoCard(
-                  title: 'Attendance: $studentName',
-                  body: 'Recent boarding and drop events.',
-                  icon: Icons.fact_check_outlined,
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20),
+                  child: Text('Recent History', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 ),
-                const SizedBox(height: 12),
-                ...history.take(8).map((item) {
-                  final row = item as Map<String, dynamic>;
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Card(
-                      child: ListTile(
-                        title: Text('${row['event_type'] ?? '-'}'),
-                        subtitle: Text('${row['recorded_at'] ?? '-'}'),
-                        trailing: Text('${row['trip_id'] ?? ''}'),
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: history.length,
+                  itemBuilder: (context, index) {
+                    final event = history[index] as Map<String, dynamic>;
+                    return ListTile(
+                      leading: Icon(
+                        event['event_type'] == 'boarded' ? Icons.login : Icons.logout,
+                        color: event['event_type'] == 'boarded' 
+                            ? DashboardTheme.of(context).attendance 
+                            : DashboardTheme.of(context).trackBus,
                       ),
-                    ),
-                  );
-                }),
-                if (history.isEmpty)
-                  const _EmptyInline(message: 'No attendance history yet.'),
+                      title: Text((event['event_type'] ?? '-').toString().toUpperCase()),
+                      subtitle: Text(event['recorded_at'].toString()),
+                    );
+                  },
+                ),
               ],
             );
           },
@@ -745,123 +1019,16 @@ class _NotificationsTabState extends State<_NotificationsTab> {
   }
 }
 
-class _ProfileTab extends StatelessWidget {
-  const _ProfileTab({
-    required this.api,
-    required this.fullName,
-  });
+class _EmptyInline extends StatelessWidget {
+  const _EmptyInline({required this.message});
 
-  final ParentApi api;
-  final String fullName;
+  final String message;
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<Map<String, dynamic>>(
-      future: api.getProfile(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const _LoadingPanel(title: 'Loading profile');
-        }
-
-        if (snapshot.hasError) {
-          return _ErrorPanel(error: snapshot.error.toString());
-        }
-
-        final user = snapshot.data ?? const <String, dynamic>{};
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-          children: [
-            _InfoCard(
-              title: 'Profile',
-              body: 'Name: ${user['fullName'] ?? fullName}',
-              icon: Icons.person_outline,
-            ),
-            const SizedBox(height: 12),
-            _InfoCard(
-              title: 'Role',
-              body: '${user['role'] ?? 'parent'}',
-              icon: Icons.badge_outlined,
-            ),
-            const SizedBox(height: 12),
-            _InfoCard(
-              title: 'School',
-              body: '${user['schoolId'] ?? '-'}',
-              icon: Icons.school_outlined,
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-String _formatDate(DateTime date) {
-  final day = date.day.toString().padLeft(2, '0');
-  final month = date.month.toString().padLeft(2, '0');
-  final year = date.year.toString();
-  return '$day/$month/$year';
-}
-
-class _HeroCard extends StatelessWidget {
-  const _HeroCard({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-  });
-
-  final String title;
-  final String subtitle;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(22),
-        gradient: LinearGradient(
-          colors: [
-            colorScheme.primaryContainer,
-            colorScheme.secondaryContainer,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                color: colorScheme.surface.withValues(alpha: 0.7),
-              ),
-              child: Icon(icon, color: colorScheme.onSurface),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: theme.textTheme.titleLarge),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: colorScheme.onSurface.withValues(alpha: 0.85),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Text(message, textAlign: TextAlign.center),
     );
   }
 }
@@ -880,7 +1047,6 @@ class _InfoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -901,9 +1067,7 @@ class _InfoCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title,
-                      style:
-                          theme.textTheme.titleLarge?.copyWith(fontSize: 18)),
+                  Text(title, style: theme.textTheme.titleLarge?.copyWith(fontSize: 18)),
                   const SizedBox(height: 4),
                   Text(body, style: theme.textTheme.bodyLarge),
                 ],
@@ -918,19 +1082,17 @@ class _InfoCard extends StatelessWidget {
 
 class _LoadingPanel extends StatelessWidget {
   const _LoadingPanel({required this.title});
-
   final String title;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           const CircularProgressIndicator(),
           const SizedBox(height: 12),
-          Text(title, style: theme.textTheme.bodyLarge),
+          Text(title, style: Theme.of(context).textTheme.bodyLarge),
         ],
       ),
     );
@@ -939,7 +1101,6 @@ class _LoadingPanel extends StatelessWidget {
 
 class _ErrorPanel extends StatelessWidget {
   const _ErrorPanel({required this.error});
-
   final String error;
 
   @override
@@ -953,11 +1114,7 @@ class _ErrorPanel extends StatelessWidget {
           children: [
             Icon(Icons.error_outline, color: colorScheme.error, size: 30),
             const SizedBox(height: 8),
-            Text(
-              'Something went wrong',
-              style: Theme.of(context).textTheme.titleMedium,
-              textAlign: TextAlign.center,
-            ),
+            Text('Something went wrong', style: Theme.of(context).textTheme.titleMedium, textAlign: TextAlign.center),
             const SizedBox(height: 6),
             Text(error, textAlign: TextAlign.center),
           ],
@@ -969,7 +1126,6 @@ class _ErrorPanel extends StatelessWidget {
 
 class _EmptyPanel extends StatelessWidget {
   const _EmptyPanel({required this.message});
-
   final String message;
 
   @override
@@ -990,16 +1146,9 @@ class _EmptyPanel extends StatelessWidget {
   }
 }
 
-class _EmptyInline extends StatelessWidget {
-  const _EmptyInline({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(12),
-      child: Text(message, textAlign: TextAlign.center),
-    );
-  }
+String _formatDate(DateTime date) {
+  final day = date.day.toString().padLeft(2, '0');
+  final month = date.month.toString().padLeft(2, '0');
+  final year = date.year.toString();
+  return '$day/$month/$year';
 }

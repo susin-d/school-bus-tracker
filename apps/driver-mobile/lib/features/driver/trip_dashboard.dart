@@ -6,6 +6,7 @@ import '../../core/app_scope.dart';
 import '../../core/app_state.dart';
 import '../../core/colors.dart';
 import '../../core/location_service.dart';
+import '../../core/marker_generator.dart';
 import 'driver_api.dart';
 import 'incident_sheet.dart';
 import 'stop_card.dart';
@@ -32,12 +33,26 @@ class _TripDashboardState extends State<TripDashboard> {
   double? _currentLat;
   double? _currentLng;
   bool _mapExpanded = false;
+  BitmapDescriptor? _busIcon;
+  BitmapDescriptor? _stopIcon;
 
   @override
   void initState() {
     super.initState();
     _loadManifest();
     _initLocationTracking();
+    _initIcons();
+  }
+
+  Future<void> _initIcons() async {
+    final bus = await MarkerGenerator.createMarkerFromEmoji('🚍');
+    final stop = await MarkerGenerator.createMarkerFromEmoji('🚏');
+    if (mounted) {
+      setState(() {
+        _busIcon = bus;
+        _stopIcon = stop;
+      });
+    }
   }
 
   @override
@@ -342,6 +357,7 @@ class _TripDashboardState extends State<TripDashboard> {
                                 markerId: const MarkerId('driver'),
                                 position: LatLng(_currentLat!, _currentLng!),
                                 infoWindow: const InfoWindow(title: 'Your Location'),
+                                icon: _busIcon ?? BitmapDescriptor.defaultMarker,
                               ),
                               ...stops
                                   .where((s) => s['latitude'] != null && s['longitude'] != null)
@@ -354,9 +370,10 @@ class _TripDashboardState extends State<TripDashboard> {
                                         infoWindow: InfoWindow(
                                           title: (s['studentName'] ?? 'Stop').toString(),
                                         ),
-                                        icon: BitmapDescriptor.defaultMarkerWithHue(
-                                          BitmapDescriptor.hueOrange,
-                                        ),
+                                        icon: _stopIcon ??
+                                            BitmapDescriptor.defaultMarkerWithHue(
+                                              BitmapDescriptor.hueOrange,
+                                            ),
                                       )),
                             },
                             myLocationButtonEnabled: false,

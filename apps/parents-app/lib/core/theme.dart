@@ -8,26 +8,41 @@ ThemeData buildSchoolBusLightTheme() {
     brightness: Brightness.light,
   ).copyWith(
     primary: AppColors.orange,
-    secondary: const Color(0xFFFFA040),
-    tertiary: AppColors.orangeStrong,
-    error: const Color(0xFFFF6B6B),
+    onPrimary: Colors.white,
+    secondary: AppColors.orangeStrong,
+    onSecondary: Colors.white,
+    tertiary: AppColors.brown,
+    error: AppColors.alert,
+    surface: AppLightColors.scaffoldBackground,
   );
   return ThemeData(
     useMaterial3: true,
     brightness: Brightness.light,
     colorScheme: colorScheme,
     scaffoldBackgroundColor: AppLightColors.scaffoldBackground,
+    extensions: [
+      DashboardTheme(
+        trackBus: AppColors.trackBus,
+        attendance: AppColors.attendance,
+        driverDetails: AppColors.driverDetails,
+        leaveRequest: AppColors.leaveRequest,
+        notification: AppColors.notification,
+      ),
+    ],
     appBarTheme: const AppBarTheme(
       backgroundColor: Colors.transparent,
       elevation: 0,
+      centerTitle: false,
       foregroundColor: AppLightColors.textPrimary,
+      iconTheme: IconThemeData(color: AppColors.orange),
     ),
-    cardTheme: const CardThemeData(
+    cardTheme: CardThemeData(
       color: AppLightColors.panelBackground,
-      elevation: 0,
+      elevation: 4,
+      shadowColor: AppColors.orange.withAlpha(20),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.all(Radius.circular(24)),
-        side: BorderSide(color: AppLightColors.panelBorder),
+        borderRadius: const BorderRadius.all(Radius.circular(24)),
+        side: BorderSide(color: AppColors.orange.withAlpha(40)),
       ),
     ),
     textTheme: const TextTheme(
@@ -59,29 +74,44 @@ ThemeData buildSchoolBusLightTheme() {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(color: colorScheme.primary, width: 1.6),
+        borderSide: BorderSide(color: colorScheme.primary, width: 2.0),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        minimumSize: const Size.fromHeight(48),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        backgroundColor: AppColors.orange,
+        foregroundColor: Colors.white,
+        minimumSize: const Size.fromHeight(56),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        elevation: 2,
       ),
     ),
     navigationBarTheme: NavigationBarThemeData(
-      height: 72,
-      indicatorColor: AppLightColors.accentSoft,
+      height: 80,
+      backgroundColor: Colors.white,
+      indicatorColor: AppColors.orange.withAlpha(30),
+      indicatorShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      iconTheme: WidgetStateProperty.resolveWith((states) {
+        if (states.contains(WidgetState.selected)) {
+          return const IconThemeData(color: AppColors.orange, size: 28);
+        }
+        return const IconThemeData(color: AppLightColors.textSecondary, size: 24);
+      }),
       labelTextStyle: WidgetStateProperty.resolveWith((states) {
         final selected = states.contains(WidgetState.selected);
         return TextStyle(
           fontSize: 12,
-          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+          fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
           color: selected
-              ? AppLightColors.textPrimary
+              ? AppColors.orange
               : AppLightColors.textSecondary,
         );
       }),
+    ),
+    floatingActionButtonTheme: const FloatingActionButtonThemeData(
+      backgroundColor: AppColors.orange,
+      foregroundColor: Colors.white,
     ),
   );
 }
@@ -91,16 +121,25 @@ ThemeData buildSchoolBusDarkTheme() {
     seedColor: AppColors.seed,
     brightness: Brightness.dark,
   ).copyWith(
-    primary: const Color(0xFFFFB366),
+    primary: AppColors.orange,
     secondary: const Color(0xFFFF9E57),
-    tertiary: AppColors.orange,
-    error: const Color(0xFFFF6B6B),
+    tertiary: AppColors.orangeStrong,
+    error: AppColors.alert,
   );
   return ThemeData(
     useMaterial3: true,
     brightness: Brightness.dark,
     colorScheme: colorScheme,
     scaffoldBackgroundColor: AppDarkColors.scaffoldBackground,
+    extensions: [
+      DashboardTheme(
+        trackBus: AppColors.trackBus.withValues(alpha: 0.8),
+        attendance: AppColors.attendance.withValues(alpha: 0.8),
+        driverDetails: AppColors.driverDetails,
+        leaveRequest: AppColors.leaveRequest.withValues(alpha: 0.8),
+        notification: AppColors.notification.withValues(alpha: 0.8),
+      ),
+    ],
     appBarTheme: const AppBarTheme(
       backgroundColor: Colors.transparent,
       elevation: 0,
@@ -168,4 +207,53 @@ ThemeData buildSchoolBusDarkTheme() {
       }),
     ),
   );
+}
+
+class DashboardTheme extends ThemeExtension<DashboardTheme> {
+  const DashboardTheme({
+    required this.trackBus,
+    required this.attendance,
+    required this.driverDetails,
+    required this.leaveRequest,
+    required this.notification,
+  });
+
+  final Color trackBus;
+  final Color attendance;
+  final Color driverDetails;
+  final Color leaveRequest;
+  final Color notification;
+
+  @override
+  DashboardTheme copyWith({
+    Color? trackBus,
+    Color? attendance,
+    Color? driverDetails,
+    Color? leaveRequest,
+    Color? notification,
+  }) {
+    return DashboardTheme(
+      trackBus: trackBus ?? this.trackBus,
+      attendance: attendance ?? this.attendance,
+      driverDetails: driverDetails ?? this.driverDetails,
+      leaveRequest: leaveRequest ?? this.leaveRequest,
+      notification: notification ?? this.notification,
+    );
+  }
+
+  @override
+  DashboardTheme lerp(ThemeExtension<DashboardTheme>? other, double t) {
+    if (other is! DashboardTheme) return this;
+    return DashboardTheme(
+      trackBus: Color.lerp(trackBus, other.trackBus, t)!,
+      attendance: Color.lerp(attendance, other.attendance, t)!,
+      driverDetails: Color.lerp(driverDetails, other.driverDetails, t)!,
+      leaveRequest: Color.lerp(leaveRequest, other.leaveRequest, t)!,
+      notification: Color.lerp(notification, other.notification, t)!,
+    );
+  }
+
+  static DashboardTheme of(BuildContext context) {
+    return Theme.of(context).extension<DashboardTheme>()!;
+  }
 }

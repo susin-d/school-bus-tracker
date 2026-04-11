@@ -5,7 +5,9 @@ import '../../core/app_scope.dart';
 import '../../core/app_state.dart';
 import '../../core/colors.dart';
 import 'driver_api.dart';
-import 'trip_dashboard.dart';
+import 'active_trip_screen.dart';
+import 'announcement_screen.dart';
+import 'student_list_screen.dart';
 
 class DriverHomeScreen extends StatefulWidget {
   const DriverHomeScreen({super.key});
@@ -14,32 +16,13 @@ class DriverHomeScreen extends StatefulWidget {
   State<DriverHomeScreen> createState() => _DriverHomeScreenState();
 }
 
-class _DriverHomeScreenState extends State<DriverHomeScreen> with SingleTickerProviderStateMixin {
+class _DriverHomeScreenState extends State<DriverHomeScreen> {
   bool _loading = false;
-  String? _error;
-  late final AnimationController _fadeController;
-  late final Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
-    _fadeController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 500),
-    );
-    _fadeAnimation = CurvedAnimation(parent: _fadeController, curve: Curves.easeOut);
-    _fadeController.forward();
-
-    // Auto-check for active trip on launch
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkForTrip();
-    });
-  }
-
-  @override
-  void dispose() {
-    _fadeController.dispose();
-    super.dispose();
+    _checkForTrip();
   }
 
   DriverApi _buildApi() {
@@ -53,11 +36,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with SingleTickerPr
   }
 
   Future<void> _checkForTrip() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-
+    setState(() => _loading = true);
     try {
       final api = _buildApi();
       final payload = await api.getCurrentTrip();
@@ -65,31 +44,23 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with SingleTickerPr
 
       if (!mounted) return;
 
-      if (trip == null) {
-        setState(() {
-          _loading = false;
-          _error = null;
-        });
+      if (trip != null) {
+        final tripData = TripData(
+          id: (trip['id'] ?? '').toString(),
+          status: (trip['status'] ?? 'ready').toString(),
+          routeName: trip['routeName'] as String?,
+          driverName: trip['driverName'] as String?,
+          studentCount: (trip['studentCount'] as int?) ?? 0,
+          raw: trip,
+        );
+        AppScope.of(context).setTrip(tripData);
+      } else {
         AppScope.of(context).setTrip(null);
-        return;
       }
-
-      final tripData = TripData(
-        id: (trip['id'] ?? '').toString(),
-        status: (trip['status'] ?? 'ready').toString(),
-        routeName: trip['routeName'] as String?,
-        driverName: trip['driverName'] as String?,
-        studentCount: (trip['studentCount'] as int?) ?? 0,
-        raw: trip,
-      );
-      AppScope.of(context).setTrip(tripData);
-      setState(() => _loading = false);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _error = 'Could not check for trips. Pull down to retry.';
-      });
+    } catch (_) {
+      // Background check, silenty fail
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -97,312 +68,198 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> with SingleTickerPr
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final appState = AppScope.of(context);
-    final user = appState.currentUser!;
-    final trip = appState.currentTrip;
+    final user = AppScope.of(context).currentUser!;
+    final trip = AppScope.of(context).currentTrip;
 
     return Scaffold(
       appBar: AppBar(
-        titleSpacing: 20,
-        title: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [AppColors.orange, AppColors.orangeStrong],
-                ),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.directions_bus_rounded, color: Colors.white, size: 20),
-            ),
-            const SizedBox(width: 10),
-            Text(
-              'SchoolBus',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-                color: isDark ? AppDarkColors.textPrimary : AppLightColors.textPrimary,
-              ),
-            ),
-          ],
-        ),
+        title: const Text('Driver Dashboard', style: TextStyle(fontWeight: FontWeight.w800)),
         actions: [
-          // Profile badge
-          Container(
-            margin: const EdgeInsets.only(right: 8),
-            child: PopupMenuButton<String>(
-              offset: const Offset(0, 44),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              itemBuilder: (context) => [
-                PopupMenuItem(
-                  enabled: false,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        user.fullName,
-                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Driver',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: isDark ? AppDarkColors.textSecondary : AppLightColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const PopupMenuDivider(),
-                PopupMenuItem(
-                  value: 'signout',
-                  child: Row(
-                    children: [
-                      Icon(Icons.logout_rounded, size: 18, color: Colors.red),
-                      const SizedBox(width: 10),
-                      const Text('Sign Out', style: TextStyle(color: Colors.red)),
-                    ],
-                  ),
-                ),
-              ],
-              onSelected: (value) {
-                if (value == 'signout') {
-                  appState.signOut();
-                }
-              },
-              child: CircleAvatar(
-                radius: 18,
-                backgroundColor: AppColors.orange.withAlpha(20),
-                child: Text(
-                  user.fullName.isNotEmpty ? user.fullName[0].toUpperCase() : 'D',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.orange,
-                    fontSize: 15,
-                  ),
-                ),
-              ),
-            ),
+          IconButton(
+            onPressed: () => AppScope.of(context).signOut(),
+            icon: const Icon(Icons.logout_rounded, color: Colors.red),
           ),
         ],
       ),
-      body: FadeTransition(
-        opacity: _fadeAnimation,
-        child: trip != null
-            ? TripDashboard(
-                trip: trip,
-                api: _buildApi(),
-                onTripEnded: () {
-                  AppScope.of(context).setTrip(null);
-                  _checkForTrip();
-                },
-              )
-            : _buildNoTripView(theme, isDark, user),
-      ),
-    );
-  }
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: _checkForTrip,
+              child: ListView(
+                padding: const EdgeInsets.all(24),
+                children: [
+                  // Welcome Card
+                  _WelcomeHeader(user: user, isDark: isDark),
+                  const SizedBox(height: 32),
 
-  Widget _buildNoTripView(ThemeData theme, bool isDark, LoggedInUser user) {
-    return RefreshIndicator(
-      onRefresh: _checkForTrip,
-      color: AppColors.orange,
-      child: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        physics: const AlwaysScrollableScrollPhysics(),
-        children: [
-          SizedBox(height: MediaQuery.of(context).size.height * 0.08),
+                  // Active Trip Summary (if any)
+                  if (trip != null) ...[
+                    _ActiveTripBanner(trip: trip, isDark: isDark),
+                    const SizedBox(height: 24),
+                  ],
 
-          // Welcome section
-          Text(
-            'Welcome back,',
-            style: theme.textTheme.bodyLarge?.copyWith(
-              color: isDark ? AppDarkColors.textSecondary : AppLightColors.textSecondary,
-            ),
-          ),
-          Text(
-            user.fullName,
-            style: theme.textTheme.headlineLarge?.copyWith(
-              fontWeight: FontWeight.w900,
-              fontSize: 32,
-            ),
-          ),
-          const SizedBox(height: 30),
-
-          // Status card
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: isDark ? AppDarkColors.panelBackground : AppLightColors.panelBackground,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                color: isDark ? AppDarkColors.panelBorder : AppLightColors.panelBorder,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withAlpha(isDark ? 30 : 8),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                Container(
-                  width: 72,
-                  height: 72,
-                  decoration: BoxDecoration(
-                    color: AppColors.orange.withAlpha(15),
-                    shape: BoxShape.circle,
-                  ),
-                  child: _loading
-                      ? Padding(
-                          padding: const EdgeInsets.all(22),
-                          child: CircularProgressIndicator(
-                            strokeWidth: 3,
-                            color: AppColors.orange,
-                          ),
-                        )
-                      : Icon(
-                          _error != null ? Icons.cloud_off_rounded : Icons.event_busy_rounded,
-                          size: 34,
-                          color: _error != null ? Colors.red : AppColors.orange,
+                  // Module Grid
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _ModuleCard(
+                          title: 'Start Trip',
+                          icon: Icons.map_rounded,
+                          color: Colors.green,
+                          isDark: isDark,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const ActiveTripScreen()),
+                          ).then((_) => _checkForTrip()),
                         ),
-                ),
-                const SizedBox(height: 18),
-                Text(
-                  _loading
-                      ? 'Checking for trips...'
-                      : (_error != null ? 'Connection Issue' : 'No Active Trip'),
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: isDark ? AppDarkColors.textPrimary : AppLightColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _loading
-                      ? 'Looking for your assigned trip...'
-                      : (_error ?? 'You don\'t have any trips assigned right now. Pull down to check again.'),
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: isDark ? AppDarkColors.textSecondary : AppLightColors.textSecondary,
-                    height: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 22),
-                if (!_loading)
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: FilledButton.icon(
-                      onPressed: _checkForTrip,
-                      icon: const Icon(Icons.refresh_rounded, size: 20),
-                      label: const Text('Check for Trip'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.orange,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
                       ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _ModuleCard(
+                          title: 'Announce',
+                          icon: Icons.campaign_rounded,
+                          color: Colors.orange,
+                          isDark: isDark,
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const AnnouncementScreen()),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  _ModuleCard(
+                    title: 'Students List',
+                    icon: Icons.groups_rounded,
+                    color: Colors.blue,
+                    isDark: isDark,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const StudentListScreen()),
                     ),
                   ),
+
+                  const SizedBox(height: 40),
+                ],
+              ),
+            ),
+    );
+  }
+}
+
+class _WelcomeHeader extends StatelessWidget {
+  const _WelcomeHeader({required this.user, required this.isDark});
+  final LoggedInUser user;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Hello,',
+          style: TextStyle(
+            fontSize: 16,
+            color: isDark ? AppDarkColors.textSecondary : AppLightColors.textSecondary,
+          ),
+        ),
+        Text(
+          user.fullName,
+          style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900),
+        ),
+      ],
+    );
+  }
+}
+
+class _ActiveTripBanner extends StatelessWidget {
+  const _ActiveTripBanner({required this.trip, required this.isDark});
+  final TripData trip;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final isActive = trip.status == 'active';
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isActive ? Colors.green.withAlpha(20) : Colors.blue.withAlpha(20),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: (isActive ? Colors.green : Colors.blue).withAlpha(50)),
+      ),
+      child: Row(
+        children: [
+          Icon(isActive ? Icons.directions_bus : Icons.schedule, color: isActive ? Colors.green : Colors.blue),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isActive ? 'Active Trip' : 'Upcoming Trip',
+                  style: TextStyle(fontWeight: FontWeight.w800, color: isActive ? Colors.green : Colors.blue),
+                ),
+                Text(trip.routeName ?? 'Route assigned', style: const TextStyle(fontSize: 13)),
               ],
             ),
           ),
-          const SizedBox(height: 24),
-
-          // Quick info cards
-          Row(
-            children: [
-              Expanded(
-                child: _InfoCard(
-                  icon: Icons.gps_fixed_rounded,
-                  label: 'GPS',
-                  value: 'Ready',
-                  color: Colors.green,
-                  isDark: isDark,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _InfoCard(
-                  icon: Icons.wifi_rounded,
-                  label: 'Network',
-                  value: 'Online',
-                  color: Colors.blue,
-                  isDark: isDark,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 40),
         ],
       ),
     );
   }
 }
 
-class _InfoCard extends StatelessWidget {
-  const _InfoCard({
+class _ModuleCard extends StatelessWidget {
+  const _ModuleCard({
+    required this.title,
     required this.icon,
-    required this.label,
-    required this.value,
     required this.color,
     required this.isDark,
+    required this.onTap,
   });
 
+  final String title;
   final IconData icon;
-  final String label;
-  final String value;
   final Color color;
   final bool isDark;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? AppDarkColors.panelBackground : AppLightColors.panelBackground,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isDark ? AppDarkColors.panelBorder : AppLightColors.panelBorder,
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: color.withAlpha(20),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, size: 18, color: color),
+    return Material(
+      color: isDark ? AppDarkColors.panelBackground : AppLightColors.panelBackground,
+      borderRadius: BorderRadius.circular(24),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          height: 140,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            border: Border.all(color: isDark ? AppDarkColors.panelBorder : AppLightColors.panelBorder),
+            borderRadius: BorderRadius.circular(24),
           ),
-          const SizedBox(width: 10),
-          Column(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? AppDarkColors.textSecondary : AppLightColors.textSecondary,
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: color.withAlpha(20),
+                  borderRadius: BorderRadius.circular(16),
                 ),
+                child: Icon(icon, color: color, size: 28),
               ),
               Text(
-                value,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                  color: color,
-                ),
+                title,
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }

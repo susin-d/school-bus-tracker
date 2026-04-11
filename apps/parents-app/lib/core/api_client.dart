@@ -1,29 +1,21 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 class ApiClient {
   ApiClient({
     required this.userId,
     this.accessToken,
     String? baseUrl,
-  }) : _baseUrl = _resolveBaseUrl(baseUrl).replaceAll(RegExp(r'/$'), '');
+  }) : _baseUrl = (baseUrl ??
+                dotenv.env['API_BASE_URL'] ??
+                'http://10.0.2.2:4000')
+            .replaceAll(RegExp(r'/$'), '');
 
   final String userId;
   final String? accessToken;
   final String _baseUrl;
-
-  static String _resolveBaseUrl(String? baseUrl) {
-    final explicit = (baseUrl ?? const String.fromEnvironment('API_BASE_URL', defaultValue: '')).trim();
-    if (explicit.isNotEmpty) {
-      return explicit;
-    }
-
-    // Android emulator cannot reach host machine via localhost.
-    if (Platform.isAndroid) {
-      return 'http://10.0.2.2:4000';
-    }
-    return 'http://localhost:4000';
-  }
 
   Future<dynamic> get(String path) async {
     final uri = Uri.parse('$_baseUrl$path');
@@ -46,7 +38,8 @@ class ApiClient {
 
   void _applyAuthHeaders(HttpClientRequest request) {
     if (accessToken != null && accessToken!.trim().isNotEmpty) {
-      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer ${accessToken!.trim()}');
+      request.headers
+          .set(HttpHeaders.authorizationHeader, 'Bearer ${accessToken!.trim()}');
       return;
     }
 
