@@ -33,7 +33,7 @@ class _SchoolBusAppState extends State<SchoolBusApp> {
       appState: _appState,
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
-        title: 'SchoolBus Bridge',
+        title: 'SURAKSHA',
         theme: buildSchoolBusLightTheme(),
         darkTheme: buildSchoolBusDarkTheme(),
         themeMode: ThemeMode.system,

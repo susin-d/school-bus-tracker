@@ -6,8 +6,11 @@ ThemeData buildSchoolBusLightTheme() {
   final colorScheme = ColorScheme.fromSeed(
     seedColor: AppColors.seed,
     brightness: Brightness.light,
+  ).copyWith(
+    error: const Color(0xFFFF6B6B),
   );
   return ThemeData(
+    useMaterial3: true,
     brightness: Brightness.light,
     colorScheme: colorScheme,
     scaffoldBackgroundColor: AppLightColors.scaffoldBackground,
@@ -84,8 +87,11 @@ ThemeData buildSchoolBusDarkTheme() {
   final colorScheme = ColorScheme.fromSeed(
     seedColor: AppColors.seed,
     brightness: Brightness.dark,
+  ).copyWith(
+    error: const Color(0xFFFF6B6B),
   );
   return ThemeData(
+    useMaterial3: true,
     brightness: Brightness.dark,
     colorScheme: colorScheme,
     scaffoldBackgroundColor: AppDarkColors.scaffoldBackground,

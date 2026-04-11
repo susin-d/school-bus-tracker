@@ -2,7 +2,7 @@
 
 ## Product Goal
 
-SchoolBus Bridge helps parents track buses safely, helps drivers run trips without unsafe communication patterns, and gives school admins operational visibility across routes, buses, students, and incidents.
+SURAKSHA helps parents track buses safely, helps drivers run trips without unsafe communication patterns, and gives school admins operational visibility across routes, buses, students, and incidents.
 
 ## Primary Users
 

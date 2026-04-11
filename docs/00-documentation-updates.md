@@ -2,7 +2,7 @@
 
 ## 📚 Summary of Changes
 
-This document tracks all documentation updates made to reflect the current state of the SchoolBus Bridge implementation.
+This document tracks all documentation updates made to reflect the current state of the SURAKSHA implementation.
 
 ---
 

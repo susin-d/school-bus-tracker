@@ -1,6 +1,6 @@
-# SchoolBus Bridge
+# SURAKSHA
 
-Monorepo scaffold for the SchoolBus Bridge platform.
+Monorepo scaffold for the SURAKSHA platform.
 
 ## Apps
 

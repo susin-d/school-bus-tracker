@@ -1,4 +1,4 @@
-# SchoolBus Bridge Docs Index
+# SURAKSHA Docs Index
 
 This folder contains the project specs plus implementation guides for current production behavior.
 Last updated: April 2026
