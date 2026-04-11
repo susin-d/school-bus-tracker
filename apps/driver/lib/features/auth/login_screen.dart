@@ -285,7 +285,10 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         fullName: session.fullName,
         role: AppRole.driver,
         accessToken: session.token,
+        gender: session.gender,
+        dateOfBirth: session.dateOfBirth,
       );
+
     } catch (e) {
       if (!mounted) return;
       setState(() => _errorMessage = _readableError(e));

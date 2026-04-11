@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import type { RealtimeEventEnvelope } from "@school-bus/shared";
 import { importLibrary, setOptions } from "@googlemaps/js-api-loader";
 
@@ -70,7 +70,7 @@ export function LiveMapPage() {
   const [maxDetourMinutes, setMaxDetourMinutes] = useState("15");
   const [selectedTripId, setSelectedTripId] = useState<string | undefined>(undefined);
   const [mapError, setMapError] = useState<string | undefined>(undefined);
-  const [settingsPanelOpen, setSettingsPanelOpen] = useState(false);
+  const [isSettingsOverlayOpen, setIsSettingsOverlayOpen] = useState(false);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<any>(null);
   const markersRef = useRef<Array<{ setMap: (map: unknown) => void }>>([]);
@@ -240,7 +240,8 @@ export function LiveMapPage() {
     } finally { setIsRunningAction(false); }
   }
 
-  async function saveMapSettings() {
+  async function saveMapSettings(event?: FormEvent) {
+    event?.preventDefault();
     if (!schoolScope) { setActionFeedback("Select a school ID before saving map settings."); return; }
     const noShow = Number(noShowWaitSeconds);
     const detour = Number(maxDetourMinutes);
@@ -254,6 +255,7 @@ export function LiveMapPage() {
         maxDetourMinutes: Math.round(detour)
       });
       setActionFeedback("Map settings saved successfully.");
+      setIsSettingsOverlayOpen(false);
       setRefreshTick((v) => v + 1);
     } catch (e) {
       setActionFeedback(e instanceof Error ? e.message : "Map settings update failed.");
@@ -408,50 +410,15 @@ export function LiveMapPage() {
               >
                 {isRunningAction ? "Running…" : "Optimize Daily Routes"}
               </button>
+              <button
+                className="resource-action subtle"
+                onClick={() => setIsSettingsOverlayOpen(true)}
+                type="button"
+              >
+                Edit Map Settings
+              </button>
             </div>
             {actionFeedback && <p className="panel-summary">{actionFeedback}</p>}
-          </section>
-
-          {/* Map settings (collapsed by default to reduce sidebar height) */}
-          <section className="resource-panel">
-            <header
-              className="resource-header"
-              style={{ cursor: "pointer" }}
-              onClick={() => setSettingsPanelOpen((v) => !v)}
-            >
-              <div><h2>Map Settings</h2></div>
-              <span className="panel-badge">{settingsPanelOpen ? "▲ Hide" : "▼ Show"}</span>
-            </header>
-            {settingsPanelOpen && (
-              <div className="resource-form">
-                <input
-                  className="resource-input"
-                  onChange={(e) => setDispatchStartTime(e.target.value)}
-                  placeholder="Dispatch start ISO time"
-                  value={dispatchStartTime}
-                />
-                <input
-                  className="resource-input"
-                  onChange={(e) => setNoShowWaitSeconds(e.target.value)}
-                  placeholder="No-show wait (seconds)"
-                  value={noShowWaitSeconds}
-                />
-                <input
-                  className="resource-input"
-                  onChange={(e) => setMaxDetourMinutes(e.target.value)}
-                  placeholder="Max detour (minutes)"
-                  value={maxDetourMinutes}
-                />
-                <button
-                  className="resource-action subtle"
-                  disabled={isRunningAction}
-                  onClick={() => void saveMapSettings()}
-                  type="button"
-                >
-                  {isRunningAction ? "Saving…" : "Save Map Settings"}
-                </button>
-              </div>
-            )}
           </section>
 
           {/* Realtime events feed */}
@@ -490,6 +457,59 @@ export function LiveMapPage() {
 
         </aside>
       </div>
+
+      {isSettingsOverlayOpen && (
+        <div className="edit-overlay-backdrop" onClick={() => setIsSettingsOverlayOpen(false)} aria-hidden="true">
+          <section
+            className="resource-panel edit-overlay-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Edit Map Settings"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <form onSubmit={(event) => void saveMapSettings(event)}>
+              <header className="resource-header">
+                <div>
+                  <p className="eyebrow">Edit settings</p>
+                  <h2>Map Settings</h2>
+                </div>
+              </header>
+              <div className="resource-form">
+                <input
+                  className="resource-input"
+                  onChange={(event) => setDispatchStartTime(event.target.value)}
+                  placeholder="Dispatch start ISO time"
+                  value={dispatchStartTime}
+                />
+                <input
+                  className="resource-input"
+                  onChange={(event) => setNoShowWaitSeconds(event.target.value)}
+                  placeholder="No-show wait (seconds)"
+                  value={noShowWaitSeconds}
+                />
+                <input
+                  className="resource-input"
+                  onChange={(event) => setMaxDetourMinutes(event.target.value)}
+                  placeholder="Max detour (minutes)"
+                  value={maxDetourMinutes}
+                />
+              </div>
+              <div className="resource-actions-row edit-overlay-actions">
+                <button className="resource-action" disabled={isRunningAction} type="submit">
+                  {isRunningAction ? "Saving..." : "Save Map Settings"}
+                </button>
+                <button
+                  className="resource-action subtle"
+                  onClick={() => setIsSettingsOverlayOpen(false)}
+                  type="button"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
     </AppShell>
   );
 }

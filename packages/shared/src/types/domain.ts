@@ -50,7 +50,10 @@ export interface UserProfile {
   fullName: string;
   phoneE164: string;
   email?: string;
+  gender?: string;
+  dateOfBirth?: string;
 }
+
 
 export interface TripSummary {
   id: string;

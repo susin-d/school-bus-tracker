@@ -36,9 +36,17 @@ class _ParentHomeScreenState extends State<ParentHomeScreen> {
   }
 
   Future<void> _initIcons() async {
-    final bus = await MarkerGenerator.createMarkerFromEmoji('🚍');
+    // Use asset icons if possible
+    BitmapDescriptor bus;
+    try {
+      bus = await BitmapDescriptor.asset(
+        const ImageConfiguration(size: Size(48, 48)),
+        'assets/images/bus_marker.png',
+      );
+    } catch (_) {
+      bus = await MarkerGenerator.createMarkerFromEmoji('🚍');
+    }
     
-    // Use asset icon for school if possible
     BitmapDescriptor school;
     try {
       school = await BitmapDescriptor.asset(
@@ -49,7 +57,16 @@ class _ParentHomeScreenState extends State<ParentHomeScreen> {
       school = await MarkerGenerator.createMarkerFromEmoji('🏫');
     }
 
-    final home = await MarkerGenerator.createMarkerFromEmoji('🏠');
+    BitmapDescriptor home;
+    try {
+      home = await BitmapDescriptor.asset(
+        const ImageConfiguration(size: Size(48, 48)),
+        'assets/images/home_marker.png',
+      );
+    } catch (_) {
+      home = await MarkerGenerator.createMarkerFromEmoji('🏠');
+    }
+
     if (mounted) {
       setState(() {
         _busIcon = bus;
@@ -744,22 +761,68 @@ class _TrackingTabState extends State<_TrackingTab> {
   late final Future<Map<String, dynamic>> _currentTripFuture;
   geo.Position? _userPosition;
   final _locationService = LocationService();
+  GoogleMapController? _mapController;
+  Map<String, dynamic>? _liveTripData;
+  bool _isFirstLoad = true;
+  String? _liveError;
 
   @override
   void initState() {
     super.initState();
     _currentTripFuture = widget.api.getCurrentTrip();
+    _initInitialData();
     _updateUserLocation();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
-      if (!mounted) return;
-      _updateUserLocation();
-      setState(() => _refreshTick += 1);
+    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (timer) async {
+      final tripData = await _currentTripFuture;
+      _onRefreshTick(tripData);
     });
   }
 
-  Future<void> _updateUserLocation() async {
+  Future<void> _goToMyLocation() async {
+    if (_userPosition != null && _mapController != null) {
+      _mapController!.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(
+            target: LatLng(_userPosition!.latitude, _userPosition!.longitude),
+            zoom: 16,
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _initInitialData() async {
+    try {
+      final tripData = await _currentTripFuture;
+      final students = (tripData['students'] as List? ?? []);
+      if (students.isNotEmpty) {
+        final studentId = students.first['id'].toString();
+        await _fetchLiveTripData(studentId);
+      }
+    } catch (e) {
+      if (mounted) setState(() => _liveError = e.toString());
+    } finally {
+      if (mounted) setState(() => _isFirstLoad = false);
+    }
+  }
+
+  Future<void> _fetchLiveTripData(String studentId) async {
+    try {
+      final data = await widget.api.getStudentLiveTrip(studentId);
+      if (mounted) {
+        setState(() {
+          _liveTripData = data;
+          _liveError = null;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _liveError = e.toString());
+    }
+  }
+
+  Future<void> _updateUserLocation({bool updateState = true}) async {
     final pos = await _locationService.getCurrentPosition();
-    if (mounted) {
+    if (updateState && mounted) {
       setState(() => _userPosition = pos);
     }
   }
@@ -768,6 +831,38 @@ class _TrackingTabState extends State<_TrackingTab> {
   void dispose() {
     _refreshTimer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _onRefreshTick(Map<String, dynamic> tripData) async {
+    if (!mounted) return;
+    
+    // Fetch all updates in parallel for efficiency
+    final updates = await Future.wait([
+      _locationService.getCurrentPosition(),
+      () async {
+        final students = (tripData['students'] as List? ?? []);
+        if (students.isNotEmpty) {
+          final studentId = students.first['id'].toString();
+          try {
+            return await widget.api.getStudentLiveTrip(studentId);
+          } catch (_) {
+            return null;
+          }
+        }
+        return null;
+      }(),
+    ]);
+
+    if (mounted) {
+      setState(() {
+        _userPosition = updates[0] as geo.Position?;
+        if (updates[1] != null) {
+          _liveTripData = updates[1] as Map<String, dynamic>?;
+          _liveError = null;
+        }
+        _refreshTick += 1;
+      });
+    }
   }
 
   @override
@@ -785,45 +880,47 @@ class _TrackingTabState extends State<_TrackingTab> {
           final students = (data['students'] as List? ?? []);
           if (trip == null || students.isEmpty) return const _EmptyPanel(message: 'No live trip currently active for tracking.');
 
-          final studentId = students.first['id'].toString();
-          return FutureBuilder<Map<String, dynamic>>(
-            key: ValueKey('live-$studentId-$_refreshTick'),
-            future: widget.api.getStudentLiveTrip(studentId),
-            builder: (context, liveSnapshot) {
-              if (liveSnapshot.connectionState != ConnectionState.done) return const _LoadingPanel(title: 'Updating location');
-              
-              final liveTrip = liveSnapshot.data ?? {};
-              final busLoc = liveTrip['busLocation'] as Map<String, dynamic>?;
-              final studentStop = liveTrip['studentStop'] as Map<String, dynamic>?;
-              final schoolLoc = liveTrip['schoolLocation'] as Map<String, dynamic>?;
-              final eta = liveTrip['estimatedDropoffAt']?.toString() ?? 'Calculating...';
-              
-              final tripData = (liveTrip['trip'] as Map<String, dynamic>?) ?? trip;
-              final isMoving = tripData['status'] == 'active' || tripData['status'] == 'paused';
+          if (_isFirstLoad && _liveTripData == null) {
+            return const _LoadingPanel(title: 'Connecting to bus GPS');
+          }
 
-              final lat = (busLoc?['latitude'] as num?)?.toDouble();
-              final lng = (busLoc?['longitude'] as num?)?.toDouble();
-              final stopLat = (studentStop?['latitude'] as num?)?.toDouble();
-              final stopLng = (studentStop?['longitude'] as num?)?.toDouble();
-              final schoolLat = (schoolLoc?['latitude'] as num?)?.toDouble();
-              final schoolLng = (schoolLoc?['longitude'] as num?)?.toDouble();
+          if (_liveError != null && _liveTripData == null) {
+            return _ErrorPanel(error: _liveError!);
+          }
 
-              final centerLat = (isMoving ? lat : null) ?? schoolLat ?? stopLat ?? 0.0;
-              final centerLng = (isMoving ? lng : null) ?? schoolLng ?? stopLng ?? 0.0;
-              final hasMapCenter = centerLat != 0.0 || centerLng != 0.0;
+          final liveTrip = _liveTripData ?? {};
+          final busLoc = liveTrip['busLocation'] as Map<String, dynamic>?;
+          final studentStop = liveTrip['studentStop'] as Map<String, dynamic>?;
+          final schoolLoc = liveTrip['schoolLocation'] as Map<String, dynamic>?;
+          final eta = liveTrip['estimatedDropoffAt']?.toString() ?? 'Calculating...';
+          
+          final tripData = (liveTrip['trip'] as Map<String, dynamic>?) ?? trip;
+          final isMoving = tripData['status'] == 'active' || tripData['status'] == 'paused';
 
-              return PermissionGuard(
-                child: Stack(
+          final lat = (busLoc?['latitude'] as num?)?.toDouble();
+          final lng = (busLoc?['longitude'] as num?)?.toDouble();
+          final stopLat = (studentStop?['latitude'] as num?)?.toDouble();
+          final stopLng = (studentStop?['longitude'] as num?)?.toDouble();
+          final schoolLat = (schoolLoc?['latitude'] as num?)?.toDouble();
+          final schoolLng = (schoolLoc?['longitude'] as num?)?.toDouble();
+
+          final centerLat = (isMoving ? lat : null) ?? schoolLat ?? stopLat ?? 0.0;
+          final centerLng = (isMoving ? lng : null) ?? schoolLng ?? stopLng ?? 0.0;
+          final hasMapCenter = centerLat != 0.0 || centerLng != 0.0;
+
+          return PermissionGuard(
+            child: Stack(
+              children: [
+                Column(
                   children: [
-                    Column(
-                      children: [
-                        if (hasMapCenter)
-                          Expanded(
-                            child: GoogleMap(
-                              initialCameraPosition: CameraPosition(target: LatLng(centerLat, centerLng), zoom: 15),
-                              myLocationEnabled: true,
-                              myLocationButtonEnabled: false,
-                              mapToolbarEnabled: false,
+                    if (hasMapCenter)
+                      Expanded(
+                        child: GoogleMap(
+                          key: const PageStorageKey('tracking_map'),
+                          initialCameraPosition: CameraPosition(target: LatLng(centerLat, centerLng), zoom: 15),
+                          myLocationEnabled: true,
+                          myLocationButtonEnabled: false,
+                          mapToolbarEnabled: false,
                               circles: {
                                 if (_userPosition != null)
                                   Circle(
@@ -851,6 +948,7 @@ class _TrackingTabState extends State<_TrackingTab> {
                                     icon: widget.homeIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
                                   ),
                               },
+                              onMapCreated: (controller) => _mapController = controller,
                             ),
                           )
                         else
@@ -860,11 +958,19 @@ class _TrackingTabState extends State<_TrackingTab> {
                       ],
                     ),
                     _buildEtaAlertBanner(eta, isMoving),
+                    if (_userPosition != null)
+                      Positioned(
+                        right: 16,
+                        bottom: 160, // Adjusted to be above the summary card
+                        child: FloatingActionButton.small(
+                          onPressed: _goToMyLocation,
+                          backgroundColor: Colors.white,
+                          child: const Icon(Icons.my_location, color: AppColors.orange),
+                        ),
+                      ),
                   ],
                 ),
               );
-            },
-          );
         },
       ),
     );

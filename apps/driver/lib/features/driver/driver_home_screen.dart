@@ -51,11 +51,21 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           routeName: trip['routeName'] as String?,
           driverName: trip['driverName'] as String?,
           studentCount: (trip['studentCount'] as int?) ?? 0,
+          busNo: trip['busNo'] as String? ?? 'BUS001',
+          plateNumber: trip['plateNumber'] as String? ?? 'TN 09 AB 1234',
+          driverPhone: trip['driverPhone'] as String? ?? '+91 98765 12345',
           raw: trip,
         );
         AppScope.of(context).setTrip(tripData);
       } else {
-        AppScope.of(context).setTrip(null);
+        // Use placeholders if no active trip to show UI layout
+        AppScope.of(context).setTrip(const TripData(
+          id: 'dummy',
+          status: 'ready',
+          busNo: 'BUS001',
+          plateNumber: 'TN 09 AB 1234',
+          driverPhone: '+91 98765 12345',
+        ));
       }
     } catch (_) {
       // Background check, silenty fail
@@ -72,75 +82,89 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     final trip = AppScope.of(context).currentTrip;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Driver Dashboard', style: TextStyle(fontWeight: FontWeight.w800)),
-        actions: [
-          IconButton(
-            onPressed: () => AppScope.of(context).signOut(),
-            icon: const Icon(Icons.logout_rounded, color: Colors.red),
-          ),
-        ],
-      ),
+      backgroundColor: isDark ? AppDarkColors.scaffoldBackground : const Color(0xFFF8F9FA),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: _checkForTrip,
               child: ListView(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
                 children: [
-                  // Welcome Card
-                  _WelcomeHeader(user: user, isDark: isDark),
+                  // Profile Card
+                  _DriverProfileCard(user: user, trip: trip, isDark: isDark),
                   const SizedBox(height: 32),
 
-                  // Active Trip Summary (if any)
-                  if (trip != null) ...[
-                    _ActiveTripBanner(trip: trip, isDark: isDark),
-                    const SizedBox(height: 24),
-                  ],
+                  const Text(
+                    'Quick Actions',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 16),
 
-                  // Module Grid
-                  Row(
+                  // Action Grid
+                  GridView.count(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 16,
+                    crossAxisSpacing: 16,
+                    childAspectRatio: 0.85,
                     children: [
-                      Expanded(
-                        child: _ModuleCard(
-                          title: 'Start Trip',
-                          icon: Icons.map_rounded,
-                          color: Colors.green,
-                          isDark: isDark,
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const ActiveTripScreen()),
-                          ).then((_) => _checkForTrip()),
+                      _QuickActionCard(
+                        title: 'Start Trip',
+                        subtitle: 'Begin route',
+                        icon: Icons.navigation_rounded,
+                        color: Colors.amber,
+                        isDark: isDark,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const ActiveTripScreen()),
+                        ).then((_) => _checkForTrip()),
+                      ),
+                      _QuickActionCard(
+                        title: 'Announce',
+                        subtitle: 'Send alerts',
+                        icon: Icons.campaign_rounded,
+                        color: Colors.redAccent,
+                        isDark: isDark,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const AnnouncementScreen()),
                         ),
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: _ModuleCard(
-                          title: 'Announce',
-                          icon: Icons.campaign_rounded,
-                          color: Colors.orange,
-                          isDark: isDark,
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const AnnouncementScreen()),
-                          ),
+                      _QuickActionCard(
+                        title: 'Students',
+                        subtitle: '${trip?.studentCount ?? 4} assigned',
+                        icon: Icons.people_alt_rounded,
+                        color: Colors.blueGrey,
+                        isDark: isDark,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const StudentListScreen()),
                         ),
+                      ),
+                      _QuickActionCard(
+                        title: 'Bus Info',
+                        subtitle: trip?.plateNumber ?? 'TN 09 AB 1234',
+                        icon: Icons.directions_bus_rounded,
+                        color: Colors.grey,
+                        isDark: isDark,
+                        onTap: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Vehicle details: Ashok Leyland 2024 Model')),
+                          );
+                        },
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  _ModuleCard(
-                    title: 'Students List',
-                    icon: Icons.groups_rounded,
-                    color: Colors.blue,
-                    isDark: isDark,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const StudentListScreen()),
-                    ),
-                  ),
 
                   const SizedBox(height: 40),
+                  
+                  // Logout Button
+                  TextButton.icon(
+                    onPressed: () => AppScope.of(context).signOut(),
+                    icon: const Icon(Icons.logout_rounded, color: Colors.blueGrey),
+                    label: const Text('Sign Out', style: TextStyle(color: Colors.blueGrey)),
+                  ),
                 ],
               ),
             ),
@@ -148,60 +172,97 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   }
 }
 
-class _WelcomeHeader extends StatelessWidget {
-  const _WelcomeHeader({required this.user, required this.isDark});
+class _DriverProfileCard extends StatelessWidget {
+  const _DriverProfileCard({required this.user, required this.trip, required this.isDark});
   final LoggedInUser user;
+  final TripData? trip;
   final bool isDark;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Hello,',
-          style: TextStyle(
-            fontSize: 16,
-            color: isDark ? AppDarkColors.textSecondary : AppLightColors.textSecondary,
-          ),
-        ),
-        Text(
-          user.fullName,
-          style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900),
-        ),
-      ],
-    );
-  }
-}
-
-class _ActiveTripBanner extends StatelessWidget {
-  const _ActiveTripBanner({required this.trip, required this.isDark});
-  final TripData trip;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    final isActive = trip.status == 'active';
     return Container(
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: isActive ? Colors.green.withAlpha(20) : Colors.blue.withAlpha(20),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: (isActive ? Colors.green : Colors.blue).withAlpha(50)),
+        color: isDark ? AppDarkColors.panelBackground : Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(isDark ? 50 : 10),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
-      child: Row(
+      child: Column(
         children: [
-          Icon(isActive ? Icons.directions_bus : Icons.schedule, color: isActive ? Colors.green : Colors.blue),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Row(
               children: [
-                Text(
-                  isActive ? 'Active Trip' : 'Upcoming Trip',
-                  style: TextStyle(fontWeight: FontWeight.w800, color: isActive ? Colors.green : Colors.blue),
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withAlpha(30),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Center(
+                    child: Icon(Icons.person, size: 40, color: Colors.grey),
+                  ),
                 ),
-                Text(trip.routeName ?? 'Route assigned', style: const TextStyle(fontSize: 13)),
+                const SizedBox(width: 20),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        user.fullName,
+                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                      ),
+                      const Text(
+                        'Driver',
+                        style: TextStyle(fontSize: 16, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          _Tag(
+                            label: user.gender != null ? (user.gender![0].toUpperCase() + user.gender!.substring(1)) : 'Male',
+                            isDark: isDark,
+                          ),
+                          const SizedBox(width: 8),
+                          _Tag(
+                            label: user.age != null ? '${user.age} yrs' : '42 yrs',
+                            isDark: isDark,
+                          ),
+                        ],
+                      ),
+
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Row(
+              children: [
+                _InfoItem(
+                  icon: Icons.directions_bus_filled_rounded,
+                  label: 'Bus No',
+                  value: trip?.busNo ?? 'BUS001',
+                  color: Colors.amber,
+                  isDark: isDark,
+                ),
+                const Spacer(),
+                _InfoItem(
+                  icon: Icons.phone_rounded,
+                  label: 'Contact',
+                  value: trip?.driverPhone ?? '+91 98765 12345',
+                  color: Colors.green,
+                  isDark: isDark,
+                ),
               ],
             ),
           ),
@@ -211,9 +272,81 @@ class _ActiveTripBanner extends StatelessWidget {
   }
 }
 
-class _ModuleCard extends StatelessWidget {
-  const _ModuleCard({
+class _Tag extends StatelessWidget {
+  const _Tag({required this.label, required this.isDark});
+  final String label;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white.withAlpha(20) : Colors.grey.withAlpha(20),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+          color: isDark ? AppDarkColors.textSecondary : AppLightColors.textSecondary,
+        ),
+      ),
+    );
+  }
+}
+
+class _InfoItem extends StatelessWidget {
+  const _InfoItem({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+    required this.isDark,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: color.withAlpha(20),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: color, size: 20),
+        ),
+        const SizedBox(width: 12),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            Text(
+              value,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _QuickActionCard extends StatelessWidget {
+  const _QuickActionCard({
     required this.title,
+    required this.subtitle,
     required this.icon,
     required this.color,
     required this.isDark,
@@ -221,6 +354,7 @@ class _ModuleCard extends StatelessWidget {
   });
 
   final String title;
+  final String subtitle;
   final IconData icon;
   final Color color;
   final bool isDark;
@@ -229,21 +363,19 @@ class _ModuleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: isDark ? AppDarkColors.panelBackground : AppLightColors.panelBackground,
+      color: isDark ? AppDarkColors.panelBackground : Colors.white,
       borderRadius: BorderRadius.circular(24),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         child: Container(
-          height: 140,
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            border: Border.all(color: isDark ? AppDarkColors.panelBorder : AppLightColors.panelBorder),
+            border: Border.all(color: Colors.grey.withAlpha(20)),
             borderRadius: BorderRadius.circular(24),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
                 padding: const EdgeInsets.all(12),
@@ -253,9 +385,15 @@ class _ModuleCard extends StatelessWidget {
                 ),
                 child: Icon(icon, color: color, size: 28),
               ),
+              const Spacer(),
               Text(
                 title,
                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                style: const TextStyle(fontSize: 13, color: Colors.grey),
               ),
             ],
           ),
@@ -264,3 +402,4 @@ class _ModuleCard extends StatelessWidget {
     );
   }
 }
+

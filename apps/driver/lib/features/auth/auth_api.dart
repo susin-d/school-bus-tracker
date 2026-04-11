@@ -35,6 +35,8 @@ class AuthApi {
       userId: userId,
       fullName: user['fullName'] as String? ?? 'Driver',
       role: AppRole.driver,
+      gender: user['gender'] as String?,
+      dateOfBirth: user['dateOfBirth'] as String?,
     );
   }
 }
@@ -45,10 +47,14 @@ class VerifiedSession {
     required this.userId,
     required this.fullName,
     required this.role,
+    this.gender,
+    this.dateOfBirth,
   });
 
   final String token;
   final String userId;
   final String fullName;
   final AppRole role;
+  final String? gender;
+  final String? dateOfBirth;
 }

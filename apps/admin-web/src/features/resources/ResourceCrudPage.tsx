@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 import { AppShell } from "../../app/AppShell";
 import { useRequiredAdminUser } from "../../core/auth";
@@ -181,7 +181,8 @@ export function ResourceCrudPage({
     return () => window.removeEventListener("keydown", handleEscape);
   }, [editId, isCreateOpen]);
 
-  async function handleCreate() {
+  async function handleCreate(event?: FormEvent) {
+    event?.preventDefault();
     const payload = normalizePayload(createForm);
     const validationErrors = validateRequired(payload);
     if (Object.keys(validationErrors).length > 0) {
@@ -200,7 +201,8 @@ export function ResourceCrudPage({
     }
   }
 
-  async function handleUpdate() {
+  async function handleUpdate(event?: FormEvent) {
+    event?.preventDefault();
     if (!editId) {
       return;
     }
@@ -248,16 +250,17 @@ export function ResourceCrudPage({
             <p className="eyebrow">Create record</p>
             <h2>{resourceLabel}</h2>
           </div>
-          <button
-            className="resource-action"
-            onClick={() => {
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
               setIsCreateOpen(true);
               setFeedback(`Creating a new ${resourceLabel.toLowerCase()} record.`);
             }}
-            type="button"
           >
-            Create {resourceLabel}
-          </button>
+            <button className="resource-action" type="submit">
+              Create {resourceLabel}
+            </button>
+          </form>
         </header>
         {feedback && <p className="panel-summary" role="status">{feedback}</p>}
 
@@ -368,46 +371,48 @@ export function ResourceCrudPage({
             aria-label={`Edit ${resourceLabel}`}
             onClick={(event) => event.stopPropagation()}
           >
-            <header className="resource-header">
-              <div>
-                <p className="eyebrow">Edit record</p>
-                <h2>{resourceLabel}</h2>
+            <form onSubmit={(event) => void handleUpdate(event)}>
+              <header className="resource-header">
+                <div>
+                  <p className="eyebrow">Edit record</p>
+                  <h2>{resourceLabel}</h2>
+                </div>
+              </header>
+              <div className="resource-form">
+                {fields.map((field) => (
+                  field.key === "is_active" ? (
+                    <select
+                      key={field.key}
+                      className={editFieldErrors[field.key] ? "resource-input resource-input-error" : "resource-input"}
+                      onChange={(event) => setEditField(field.key, event.target.value)}
+                      value={editForm[field.key] ?? "true"}
+                    >
+                      <option value="true">Active</option>
+                      <option value="false">Inactive</option>
+                    </select>
+                  ) : (
+                    <input
+                      key={field.key}
+                      className={editFieldErrors[field.key] ? "resource-input resource-input-error" : "resource-input"}
+                      onChange={(event) => setEditField(field.key, event.target.value)}
+                      placeholder={`${field.label}${field.required ? " *" : ""}`}
+                      value={editForm[field.key] ?? ""}
+                    />
+                  )
+                ))}
               </div>
-            </header>
-            <div className="resource-form">
-              {fields.map((field) => (
-                field.key === "is_active" ? (
-                  <select
-                    key={field.key}
-                    className={editFieldErrors[field.key] ? "resource-input resource-input-error" : "resource-input"}
-                    onChange={(event) => setEditField(field.key, event.target.value)}
-                    value={editForm[field.key] ?? "true"}
-                  >
-                    <option value="true">Active</option>
-                    <option value="false">Inactive</option>
-                  </select>
-                ) : (
-                  <input
-                    key={field.key}
-                    className={editFieldErrors[field.key] ? "resource-input resource-input-error" : "resource-input"}
-                    onChange={(event) => setEditField(field.key, event.target.value)}
-                    placeholder={`${field.label}${field.required ? " *" : ""}`}
-                    value={editForm[field.key] ?? ""}
-                  />
-                )
-              ))}
-            </div>
-            {Object.values(editFieldErrors).filter(Boolean).length > 0 && (
-              <p className="field-error">Fix required fields before saving.</p>
-            )}
-            <div className="resource-actions-row edit-overlay-actions">
-              <button className="resource-action" onClick={handleUpdate} type="button">
-                Save {resourceLabel}
-              </button>
-              <button className="resource-action subtle" onClick={resetEditForm} type="button">
-                Cancel
-              </button>
-            </div>
+              {Object.values(editFieldErrors).filter(Boolean).length > 0 && (
+                <p className="field-error">Fix required fields before saving.</p>
+              )}
+              <div className="resource-actions-row edit-overlay-actions">
+                <button className="resource-action" type="submit">
+                  Save {resourceLabel}
+                </button>
+                <button className="resource-action subtle" onClick={resetEditForm} type="button">
+                  Cancel
+                </button>
+              </div>
+            </form>
           </section>
         </div>
       )}
@@ -428,53 +433,55 @@ export function ResourceCrudPage({
             aria-label={`Create ${resourceLabel}`}
             onClick={(event) => event.stopPropagation()}
           >
-            <header className="resource-header">
-              <div>
-                <p className="eyebrow">Create record</p>
-                <h2>{resourceLabel}</h2>
+            <form onSubmit={(event) => void handleCreate(event)}>
+              <header className="resource-header">
+                <div>
+                  <p className="eyebrow">Create record</p>
+                  <h2>{resourceLabel}</h2>
+                </div>
+              </header>
+              <div className="resource-form">
+                {fields.map((field) => (
+                  field.key === "is_active" ? (
+                    <select
+                      key={field.key}
+                      className={createFieldErrors[field.key] ? "resource-input resource-input-error" : "resource-input"}
+                      onChange={(event) => setCreateField(field.key, event.target.value)}
+                      value={createForm[field.key] ?? "true"}
+                    >
+                      <option value="true">Active</option>
+                      <option value="false">Inactive</option>
+                    </select>
+                  ) : (
+                    <input
+                      key={field.key}
+                      className={createFieldErrors[field.key] ? "resource-input resource-input-error" : "resource-input"}
+                      onChange={(event) => setCreateField(field.key, event.target.value)}
+                      placeholder={`${field.label}${field.required ? " *" : ""}`}
+                      value={createForm[field.key] ?? ""}
+                    />
+                  )
+                ))}
               </div>
-            </header>
-            <div className="resource-form">
-              {fields.map((field) => (
-                field.key === "is_active" ? (
-                  <select
-                    key={field.key}
-                    className={createFieldErrors[field.key] ? "resource-input resource-input-error" : "resource-input"}
-                    onChange={(event) => setCreateField(field.key, event.target.value)}
-                    value={createForm[field.key] ?? "true"}
-                  >
-                    <option value="true">Active</option>
-                    <option value="false">Inactive</option>
-                  </select>
-                ) : (
-                  <input
-                    key={field.key}
-                    className={createFieldErrors[field.key] ? "resource-input resource-input-error" : "resource-input"}
-                    onChange={(event) => setCreateField(field.key, event.target.value)}
-                    placeholder={`${field.label}${field.required ? " *" : ""}`}
-                    value={createForm[field.key] ?? ""}
-                  />
-                )
-              ))}
-            </div>
-            {Object.values(createFieldErrors).filter(Boolean).length > 0 && (
-              <p className="field-error">Fix required fields before saving.</p>
-            )}
-            <div className="resource-actions-row edit-overlay-actions">
-              <button className="resource-action" onClick={handleCreate} type="button">
-                Save {resourceLabel}
-              </button>
-              <button
-                className="resource-action subtle"
-                onClick={() => {
-                  setIsCreateOpen(false);
-                  setCreateFieldErrors({});
-                }}
-                type="button"
-              >
-                Cancel
-              </button>
-            </div>
+              {Object.values(createFieldErrors).filter(Boolean).length > 0 && (
+                <p className="field-error">Fix required fields before saving.</p>
+              )}
+              <div className="resource-actions-row edit-overlay-actions">
+                <button className="resource-action" type="submit">
+                  Save {resourceLabel}
+                </button>
+                <button
+                  className="resource-action subtle"
+                  onClick={() => {
+                    setIsCreateOpen(false);
+                    setCreateFieldErrors({});
+                  }}
+                  type="button"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
           </section>
         </div>
       )}

@@ -8,13 +8,33 @@ class LoggedInUser {
     required this.fullName,
     required this.role,
     this.accessToken,
+    this.gender,
+    this.dateOfBirth,
   });
 
   final String id;
   final String fullName;
   final AppRole role;
   final String? accessToken;
+  final String? gender;
+  final String? dateOfBirth;
+
+  int? get age {
+    if (dateOfBirth == null) return null;
+    try {
+      final dob = DateTime.parse(dateOfBirth!);
+      final now = DateTime.now();
+      int age = now.year - dob.year;
+      if (now.month < dob.month || (now.month == dob.month && now.day < dob.day)) {
+        age--;
+      }
+      return age;
+    } catch (_) {
+      return null;
+    }
+  }
 }
+
 
 class TripData {
   const TripData({
@@ -23,6 +43,9 @@ class TripData {
     this.routeName,
     this.driverName,
     this.studentCount = 0,
+    this.busNo,
+    this.plateNumber,
+    this.driverPhone,
     this.raw = const <String, dynamic>{},
   });
 
@@ -31,19 +54,32 @@ class TripData {
   final String? routeName;
   final String? driverName;
   final int studentCount;
+  final String? busNo;
+  final String? plateNumber;
+  final String? driverPhone;
   final Map<String, dynamic> raw;
 
-  TripData copyWith({String? status, Map<String, dynamic>? raw}) {
+  TripData copyWith({
+    String? status,
+    Map<String, dynamic>? raw,
+    String? busNo,
+    String? plateNumber,
+    String? driverPhone,
+  }) {
     return TripData(
       id: id,
       status: status ?? this.status,
       routeName: routeName,
       driverName: driverName,
       studentCount: studentCount,
+      busNo: busNo ?? this.busNo,
+      plateNumber: plateNumber ?? this.plateNumber,
+      driverPhone: driverPhone ?? this.driverPhone,
       raw: raw ?? this.raw,
     );
   }
 }
+
 
 class AppState extends ChangeNotifier {
   LoggedInUser? _currentUser;
@@ -67,15 +103,20 @@ class AppState extends ChangeNotifier {
     required String fullName,
     required AppRole role,
     String? accessToken,
+    String? gender,
+    String? dateOfBirth,
   }) {
     _currentUser = LoggedInUser(
       id: userId,
       fullName: fullName,
       role: role,
       accessToken: accessToken,
+      gender: gender,
+      dateOfBirth: dateOfBirth,
     );
     notifyListeners();
   }
+
 
   void signOut() {
     _currentUser = null;

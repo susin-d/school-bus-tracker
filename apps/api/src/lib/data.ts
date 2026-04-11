@@ -59,9 +59,12 @@ function mapUserProfile(row: RecordMap): UserProfile {
     role: (row.role as UserProfile["role"]) ?? "parent",
     fullName: asString(row.full_name, "Unknown User"),
     phoneE164: asString(row.phone_e164 || row.phone_number),
-    email: typeof row.email === "string" ? row.email : undefined
+    email: typeof row.email === "string" ? row.email : undefined,
+    gender: typeof row.gender === "string" ? row.gender : undefined,
+    dateOfBirth: toIsoString(row.date_of_birth)
   };
 }
+
 
 function mapTripSummary(row: RecordMap): TripSummary {
   const driverRow = row.driver as RecordMap | undefined;

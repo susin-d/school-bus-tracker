@@ -9,6 +9,8 @@ type DriverSeed = {
   fullName: string;
   phone: string;
   licenseNo: string;
+  gender: "male" | "female";
+  dob: string;
 };
 
 type StudentSeed = {
@@ -40,7 +42,9 @@ const DRIVERS: DriverSeed[] = [
     password: "DriverAdyar#2026",
     fullName: "Arun Prakash",
     phone: "+919840000101",
-    licenseNo: "TN-ADY-LIC-0101"
+    licenseNo: "TN-ADY-LIC-0101",
+    gender: "male",
+    dob: "1981-05-12"
   },
   {
     key: "d2",
@@ -48,7 +52,9 @@ const DRIVERS: DriverSeed[] = [
     password: "DriverVelachery#2026",
     fullName: "Bala Subramanian",
     phone: "+919840000102",
-    licenseNo: "TN-VEL-LIC-0102"
+    licenseNo: "TN-VEL-LIC-0102",
+    gender: "male",
+    dob: "1978-11-20"
   },
   {
     key: "d3",
@@ -56,7 +62,9 @@ const DRIVERS: DriverSeed[] = [
     password: "DriverThiruvanmiyur#2026",
     fullName: "Charan Kumar",
     phone: "+919840000103",
-    licenseNo: "TN-THI-LIC-0103"
+    licenseNo: "TN-THI-LIC-0103",
+    gender: "male",
+    dob: "1985-03-15"
   }
 ];
 
@@ -280,6 +288,8 @@ async function main() {
       email: driver.email,
       full_name: driver.fullName,
       role: "driver",
+      gender: driver.gender,
+      date_of_birth: driver.dob,
       school_id: SCHOOL.id,
       is_active: true,
       created_at: now,
@@ -308,6 +318,8 @@ async function main() {
       last_name: lastName,
       phone_number: driver.phone,
       license_number: driver.licenseNo,
+      gender: driver.gender,
+      date_of_birth: driver.dob,
       is_active: true,
       created_at: now,
       updated_at: now
