@@ -18,15 +18,17 @@ export function StopsPage() {
       updateResource={updateStop}
       deleteResource={deleteStop}
       createTemplate={{
-        name: "",
-        code: "",
+        stop_name: "",
         address: "",
+        route_id: "",
+        sequence_order: "",
         school_id: ""
       }}
       fields={[
-        { key: "name", label: "Name", placeholder: "Stop name", required: true },
-        { key: "code", label: "Code", placeholder: "Stop code" },
+        { key: "stop_name", label: "Name", placeholder: "Stop name", required: true },
         { key: "address", label: "Address", placeholder: "Stop address" },
+        { key: "route_id", label: "Route", placeholder: "Route ID" },
+        { key: "sequence_order", label: "Sequence", placeholder: "Sequence order" },
         { key: "school_id", label: "School", placeholder: "School ID (super admin only)" }
       ]}
     />

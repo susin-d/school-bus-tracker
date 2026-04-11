@@ -182,6 +182,13 @@ export interface LiveDriverMapItem {
   clusterKey?: string;
 }
 
+export interface SchoolDispatchLocation {
+  schoolId: string;
+  schoolName?: string;
+  latitude: number;
+  longitude: number;
+}
+
 export interface ParentLiveTrip {
   studentId: string;
   trip: TripSummary | null;

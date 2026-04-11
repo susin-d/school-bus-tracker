@@ -5,6 +5,7 @@ import type {
   NightlyPlannerRunsResponse,
   OptimizeDailyRoutesResponse,
   RealtimeEventsResponse,
+  SchoolDispatchLocationsResponse,
   SchoolMapSettingsResponse,
   StudentGeocodeResponse,
   UpdateSchoolMapSettingsRequest,
@@ -130,7 +131,7 @@ export function listLeaveRequests(currentUser: AdminRequestUser) {
 
 export function createSchool(
   currentUser: AdminRequestUser,
-  payload: { name: string; timezone: string }
+  payload: { name: string; address?: string }
 ) {
   return requestJson<Record<string, unknown>>(
     "POST",
@@ -148,7 +149,7 @@ export function deleteSchool(currentUser: AdminRequestUser, schoolId: string) {
 export function updateSchool(
   currentUser: AdminRequestUser,
   schoolId: string,
-  payload: { name: string; timezone: string }
+  payload: { name: string; address?: string }
 ) {
   return requestJson<Record<string, unknown>>(
     "PUT",
@@ -166,6 +167,7 @@ export function createUser(
     role: string;
     school_id?: string;
     status?: string;
+    is_active?: boolean;
   }
 ) {
   return requestJson<Record<string, unknown>>(
@@ -198,6 +200,7 @@ export function updateUser(
     role?: string;
     school_id?: string;
     status?: string;
+    is_active?: boolean;
   }
 ) {
   return requestJson<Record<string, unknown>>(
@@ -217,6 +220,7 @@ export function createStudent(
     full_name: string;
     grade: string;
     address_text?: string;
+    home_address?: string;
     school_id?: string;
   }
 ) {
@@ -249,6 +253,7 @@ export function updateStudent(
     full_name?: string;
     grade?: string;
     address_text?: string;
+    home_address?: string;
     school_id?: string;
   }
 ) {
@@ -526,6 +531,22 @@ export function listRealtimeMapEvents(
         ...(options?.schoolId ? { schoolId: options.schoolId } : {}),
         ...(options?.tripId ? { tripId: options.tripId } : {}),
         ...(options?.since ? { since: options.since } : {})
+      }
+    }
+  );
+}
+
+export function listSchoolDispatchLocations(
+  currentUser: AdminRequestUser,
+  schoolId?: string
+) {
+  return requestJson<SchoolDispatchLocationsResponse>(
+    "GET",
+    "/maps/schools/dispatch-locations",
+    currentUser,
+    {
+      query: {
+        ...(schoolId ? { schoolId } : {})
       }
     }
   );

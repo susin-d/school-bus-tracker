@@ -26,8 +26,42 @@ import { tripsRouter } from "./modules/trips/routes.js";
 
 export const app: Express = express();
 
+const ansi = {
+  reset: "\x1b[0m",
+  green: "\x1b[32m",
+  cyan: "\x1b[36m",
+  yellow: "\x1b[33m",
+  red: "\x1b[31m"
+};
+
+function colorizeStatusCode(statusCode: number) {
+  const color =
+    statusCode >= 500
+      ? ansi.red
+      : statusCode >= 400
+        ? ansi.yellow
+        : statusCode >= 300
+          ? ansi.cyan
+          : ansi.green;
+
+  return `${color}${statusCode}${ansi.reset}`;
+}
+
 app.use(cors());
 app.use(express.json());
+app.use((request, response, next) => {
+  const startedAt = process.hrtime.bigint();
+
+  response.on("finish", () => {
+    const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+    const statusCode = colorizeStatusCode(response.statusCode);
+    console.log(
+      `[api] ${request.method} ${request.originalUrl} ${statusCode} ${elapsedMs.toFixed(1)}ms`
+    );
+  });
+
+  next();
+});
 
 app.get("/health", async (_request, response) => {
   try {

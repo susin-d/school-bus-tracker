@@ -94,7 +94,7 @@ export function StudentsPage() {
       await createStudent(currentUser, {
         full_name: fullName.trim(),
         grade: grade.trim(),
-        address_text: addressText.trim() || undefined,
+        home_address: addressText.trim() || undefined,
         school_id: currentUser.role === "super_admin" ? (schoolId.trim() || undefined) : currentUser.schoolId
       });
       setFullName("");
@@ -136,7 +136,7 @@ export function StudentsPage() {
       await updateStudent(currentUser, editId, {
         full_name: editFullName.trim(),
         grade: editGrade.trim(),
-        address_text: editAddressText.trim() || undefined,
+        home_address: editAddressText.trim() || undefined,
         school_id: currentUser.role === "super_admin" ? (editSchoolId.trim() || undefined) : undefined
       });
       resetEditForm();
@@ -217,11 +217,11 @@ export function StudentsPage() {
               <thead>
                 <tr>
                   <th>ID</th>
-                  <th>Name</th>
+                  <th>Full Name</th>
                   <th>Grade</th>
-                  <th>Address</th>
-                  <th>Geocode</th>
-                  <th>School</th>
+                  <th>Home Address</th>
+                  <th>Location</th>
+                  <th>School ID</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -231,10 +231,12 @@ export function StudentsPage() {
                     <td>{String(student.id ?? "n/a")}</td>
                     <td>{String(student.full_name ?? student.name ?? "Unnamed Student")}</td>
                     <td>{String(student.grade ?? "n/a")}</td>
-                    <td>{String(student.address_text ?? student.address ?? "n/a")}</td>
+                    <td>{String(student.home_address ?? student.address_text ?? student.address ?? "n/a")}</td>
                     <td>
-                      {student.lat != null && student.lng != null
-                        ? `${student.lat}, ${student.lng}`
+                      {student.latitude != null && student.longitude != null
+                        ? `${student.latitude}, ${student.longitude}`
+                        : student.lat != null && student.lng != null
+                          ? `${student.lat}, ${student.lng}`
                         : String(student.geocode_status ?? "pending")}
                     </td>
                     <td>{String(student.school_id ?? currentUser.schoolId ?? "n/a")}</td>
@@ -246,7 +248,7 @@ export function StudentsPage() {
                             setEditId(String(student.id));
                             setEditFullName(String(student.full_name ?? student.name ?? ""));
                             setEditGrade(String(student.grade ?? ""));
-                            setEditAddressText(String(student.address_text ?? student.address ?? ""));
+                            setEditAddressText(String(student.home_address ?? student.address_text ?? student.address ?? ""));
                             setEditSchoolId(String(student.school_id ?? currentUser.schoolId ?? ""));
                           }}
                           type="button"

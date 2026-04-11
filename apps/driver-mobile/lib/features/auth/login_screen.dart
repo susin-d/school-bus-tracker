@@ -12,9 +12,6 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _nameController = TextEditingController();
-  final _userIdController = TextEditingController(text: 'driver-1');
-  final _accessTokenController = TextEditingController();
   final _phoneController = TextEditingController();
   final _otpController = TextEditingController();
   final _emailController = TextEditingController();
@@ -29,9 +26,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _userIdController.dispose();
-    _accessTokenController.dispose();
     _phoneController.dispose();
     _otpController.dispose();
     _emailController.dispose();
@@ -65,8 +59,6 @@ class _LoginScreenState extends State<LoginScreen> {
             _buildOtpCard(theme),
             const SizedBox(height: 16),
             _buildEmailCard(theme),
-            const SizedBox(height: 16),
-            _buildDevCard(theme),
             if (_feedback.isNotEmpty) ...[
               const SizedBox(height: 16),
               Text(
@@ -174,56 +166,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildDevCard(ThemeData theme) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Dev Login', style: theme.textTheme.titleLarge?.copyWith(fontSize: 18)),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _nameController,
-              decoration: const InputDecoration(
-                hintText: 'Enter your name',
-                labelText: 'Full name',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _userIdController,
-              decoration: const InputDecoration(
-                hintText: 'driver-1',
-                labelText: 'User ID',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _accessTokenController,
-              decoration: const InputDecoration(
-                hintText: 'Bearer token for real auth mode',
-                labelText: 'Access Token (optional)',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                key: const Key('continue_button'),
-                onPressed: _busy ? null : _handleDevSignIn,
-                child: const Text('Continue (Dev)'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Future<void> _handleSendOtp() async {
     final phone = _phoneController.text.trim();
     if (phone.isEmpty) {
@@ -287,18 +229,6 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       _setFeedback('Verification and welcome emails sent.');
     });
-  }
-
-  void _handleDevSignIn() {
-    final userId = _userIdController.text.trim().isEmpty ? 'driver-1' : _userIdController.text.trim();
-    final fullName = _nameController.text.trim().isEmpty ? 'Driver User' : _nameController.text.trim();
-
-    AppScope.of(context).signIn(
-      userId: userId,
-      fullName: fullName,
-      role: AppRole.driver,
-      accessToken: _accessTokenController.text.trim().isEmpty ? null : _accessTokenController.text.trim(),
-    );
   }
 
   Future<void> _runAsync(Future<void> Function() action) async {

@@ -1,22 +1,13 @@
 import 'dart:async';
 import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api_access.dart';
 import '../../core/api_client.dart';
 import '../../core/app_scope.dart';
 import 'driver_api.dart';
-
-String? _buildStaticMapUrl(double? latitude, double? longitude) {
-  if (latitude == null || longitude == null) {
-    return null;
-  }
-  final center = '$latitude,$longitude';
-  final encodedCenter = Uri.encodeComponent(center);
-  final marker = Uri.encodeComponent('$center,orange-pushpin');
-  return 'https://staticmap.openstreetmap.de/staticmap.php?center=$encodedCenter&zoom=13&size=720x320&markers=$marker';
-}
 
 class DriverHomeScreen extends StatefulWidget {
   const DriverHomeScreen({super.key});
@@ -257,6 +248,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               children: [
                 TextField(
                   controller: _latitudeController,
+                  onChanged: (_) => setState(() {}),
                   decoration: const InputDecoration(
                     labelText: 'Latitude',
                     border: OutlineInputBorder(),
@@ -265,6 +257,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 const SizedBox(height: 10),
                 TextField(
                   controller: _longitudeController,
+                  onChanged: (_) => setState(() {}),
                   decoration: const InputDecoration(
                     labelText: 'Longitude',
                     border: OutlineInputBorder(),
@@ -307,19 +300,31 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                   builder: (context) {
                     final latitude = double.tryParse(_latitudeController.text.trim());
                     final longitude = double.tryParse(_longitudeController.text.trim());
-                    final mapUrl = _buildStaticMapUrl(latitude, longitude);
-                    if (mapUrl == null) {
+                    if (latitude == null || longitude == null) {
                       return const Text('Enter valid coordinates to preview the map.');
                     }
+
+                    final target = LatLng(latitude, longitude);
                     return ClipRRect(
                       borderRadius: BorderRadius.circular(14),
-                      child: Image.network(
-                        mapUrl,
+                      child: SizedBox(
                         height: 200,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Text('Map preview unavailable right now.');
-                        },
+                        child: GoogleMap(
+                          key: ValueKey('driver-map-$latitude-$longitude'),
+                          initialCameraPosition: CameraPosition(
+                            target: target,
+                            zoom: 14,
+                          ),
+                          markers: {
+                            Marker(
+                              markerId: const MarkerId('driver-location'),
+                              position: target,
+                              infoWindow: const InfoWindow(title: 'Current Driver Location'),
+                            )
+                          },
+                          myLocationButtonEnabled: false,
+                          zoomControlsEnabled: true,
+                        ),
                       ),
                     );
                   },

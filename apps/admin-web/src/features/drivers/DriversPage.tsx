@@ -19,13 +19,19 @@ export function DriversPage() {
       deleteResource={deleteDriver}
       createTemplate={{
         user_id: "",
-        license_no: "",
+        full_name: "",
+        phone_number: "",
+        license_number: "",
+        assigned_bus_id: "",
         status: "active",
         school_id: ""
       }}
       fields={[
         { key: "user_id", label: "User ID", placeholder: "Linked user id", required: true },
-        { key: "license_no", label: "License", placeholder: "License number" },
+        { key: "full_name", label: "Full Name", placeholder: "Driver name", required: true },
+        { key: "phone_number", label: "Phone", placeholder: "Phone number" },
+        { key: "license_number", label: "License", placeholder: "License number" },
+        { key: "assigned_bus_id", label: "Assigned Bus", placeholder: "Bus ID" },
         { key: "status", label: "Status", placeholder: "active" },
         { key: "school_id", label: "School", placeholder: "School ID (super admin only)" }
       ]}

@@ -1,15 +1,10 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../core/api_client.dart';
 import '../../core/app_scope.dart';
 import 'parent_api.dart';
-
-bool _isWidgetTestRuntime() {
-  return Platform.environment.containsKey('FLUTTER_TEST');
-}
 
 class ParentHomeScreen extends StatefulWidget {
   const ParentHomeScreen({super.key});
@@ -355,45 +350,38 @@ class _TrackingTabState extends State<_TrackingTab> {
                     height: 220,
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(16),
-                      child: _isWidgetTestRuntime()
-                          ? const _InfoCard(
-                              title: 'Map preview',
-                              body:
-                                  'Map preview is not available in this mode.',
-                              icon: Icons.map_outlined,
-                            )
-                          : GoogleMap(
-                              initialCameraPosition: CameraPosition(
-                                target: LatLng(latitude, longitude),
-                                zoom: 14,
-                              ),
-                              myLocationButtonEnabled: false,
-                              zoomControlsEnabled: false,
-                              markers: {
-                                Marker(
-                                  markerId: const MarkerId('bus'),
-                                  position: LatLng(latitude, longitude),
-                                  infoWindow: const InfoWindow(title: 'Bus'),
-                                ),
-                                if (nextStopLat != null && nextStopLng != null)
-                                  Marker(
-                                    markerId:
-                                        const MarkerId('school_next_stop'),
-                                    position: LatLng(nextStopLat, nextStopLng),
-                                    infoWindow:
-                                        const InfoWindow(title: 'Next Stop'),
-                                  ),
-                                if (studentStopLat != null &&
-                                    studentStopLng != null)
-                                  Marker(
-                                    markerId: const MarkerId('home_stop'),
-                                    position:
-                                        LatLng(studentStopLat, studentStopLng),
-                                    infoWindow:
-                                        const InfoWindow(title: 'Home Stop'),
-                                  ),
-                              },
+                      child: GoogleMap(
+                        initialCameraPosition: CameraPosition(
+                          target: LatLng(latitude, longitude),
+                          zoom: 14,
+                        ),
+                        myLocationButtonEnabled: false,
+                        zoomControlsEnabled: false,
+                        markers: {
+                          Marker(
+                            markerId: const MarkerId('bus'),
+                            position: LatLng(latitude, longitude),
+                            infoWindow: const InfoWindow(title: 'Bus'),
+                          ),
+                          if (nextStopLat != null && nextStopLng != null)
+                            Marker(
+                              markerId:
+                                  const MarkerId('school_next_stop'),
+                              position: LatLng(nextStopLat, nextStopLng),
+                              infoWindow:
+                                  const InfoWindow(title: 'Next Stop'),
                             ),
+                          if (studentStopLat != null &&
+                              studentStopLng != null)
+                            Marker(
+                              markerId: const MarkerId('home_stop'),
+                              position:
+                                  LatLng(studentStopLat, studentStopLng),
+                              infoWindow:
+                                  const InfoWindow(title: 'Home Stop'),
+                            ),
+                        },
+                      ),
                     ),
                   )
                 else

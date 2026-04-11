@@ -5,6 +5,7 @@ import type {
   AttendanceEventType,
   GeocodeStatus,
   LiveDriverMapItem,
+  SchoolDispatchLocation,
   NightlyPlannerRun,
   LeaveRequestRecord,
   ParentLiveTrip,
@@ -163,6 +164,10 @@ export interface StopActionResponse {
 
 export interface DriversLiveMapResponse {
   drivers: LiveDriverMapItem[];
+}
+
+export interface SchoolDispatchLocationsResponse {
+  schools: SchoolDispatchLocation[];
 }
 
 export interface ParentLiveTripResponse {

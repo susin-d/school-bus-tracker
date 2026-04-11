@@ -2,6 +2,7 @@ import type {
   BulkGeocodeResponse,
   LiveDriverMapItem,
   ParentLiveTrip,
+  SchoolDispatchLocation,
   SchoolMapSettings,
   StudentGeocodeResponse,
   TripManifestResponse,
@@ -1104,13 +1105,39 @@ export async function listLiveDrivers(input: {
 
   const trips = (data ?? []) as RecordMap[];
   const items: LiveDriverMapItem[] = [];
+  const schoolDispatchCache = new Map<string, { latitude?: number; longitude?: number }>();
+
+  async function getSchoolDispatchLocation(schoolId: string) {
+    const cached = schoolDispatchCache.get(schoolId);
+    if (cached) {
+      return cached;
+    }
+
+    const settings = await selectSchoolMapSettings(schoolId);
+    const location = {
+      latitude: settings.dispatchLatitude,
+      longitude: settings.dispatchLongitude
+    };
+    schoolDispatchCache.set(schoolId, location);
+    return location;
+  }
 
   for (const trip of trips) {
     const tripId = asString(trip.id);
+    const tripSchoolId = asString(trip.school_id);
+    const tripStatus = (trip.status as LiveDriverMapItem["status"]) ?? "scheduled";
     const stops = await listTripStops(tripId);
     const nextStop = stops
       .filter((stop) => !isCompletedStatus(stop.stopStatus))
       .sort((left, right) => left.sequence - right.sequence)[0];
+
+    let latitude = asNumber(trip.last_location_lat);
+    let longitude = asNumber(trip.last_location_lng);
+    if ((tripStatus !== "active" || latitude == null || longitude == null) && tripSchoolId) {
+      const dispatch = await getSchoolDispatchLocation(tripSchoolId);
+      latitude = dispatch.latitude ?? latitude;
+      longitude = dispatch.longitude ?? longitude;
+    }
 
     const plannedMs = nextStop?.plannedEta ? Date.parse(nextStop.plannedEta) : NaN;
     const currentMs = nextStop?.currentEta ? Date.parse(nextStop.currentEta) : NaN;
@@ -1121,15 +1148,15 @@ export async function listLiveDrivers(input: {
 
     items.push({
       tripId,
-      schoolId: asString(trip.school_id),
+      schoolId: tripSchoolId,
       schoolName: asString(trip.school_name) || undefined,
       driverId: asString(trip.driver_id) || undefined,
       driverName: asString(trip.driver_name) || undefined,
       busLabel: asString(trip.bus_label) || undefined,
       routeName: asString(trip.route_name) || undefined,
-      status: (trip.status as LiveDriverMapItem["status"]) ?? "scheduled",
-      latitude: asNumber(trip.last_location_lat),
-      longitude: asNumber(trip.last_location_lng),
+      status: tripStatus,
+      latitude,
+      longitude,
       heading: asNumber(trip.last_location_heading),
       speedKph: asNumber(trip.last_location_speed_kph),
       locationRecordedAt: asIso(trip.last_location_at),
@@ -1138,13 +1165,82 @@ export async function listLiveDrivers(input: {
       etaDelayMinutes,
       isDelayed: etaDelayMinutes >= 5,
       clusterKey:
-        input.actor.role === "super_admin" && input.clusterMode === "grid" && asNumber(trip.last_location_lat) != null && asNumber(trip.last_location_lng) != null
-          ? `${Math.round((asNumber(trip.last_location_lat) ?? 0) * 20) / 20},${Math.round((asNumber(trip.last_location_lng) ?? 0) * 20) / 20}`
+        input.actor.role === "super_admin" && input.clusterMode === "grid" && latitude != null && longitude != null
+          ? `${Math.round(latitude * 20) / 20},${Math.round(longitude * 20) / 20}`
           : undefined
     });
   }
 
   return items;
+}
+
+export async function listSchoolDispatchLocations(input: {
+  actor: UserProfile;
+  schoolId?: string;
+}) {
+  if (input.actor.role !== "admin" && input.actor.role !== "super_admin") {
+    throw new HttpError(403, "Only school admins and super admins can access school map locations", "maps_access_forbidden");
+  }
+
+  if (input.actor.role === "admin") {
+    if (input.schoolId && input.schoolId !== input.actor.schoolId) {
+      throw new HttpError(403, "You cannot access another school's map", "maps_access_forbidden");
+    }
+  }
+
+  const scopeSchoolId = input.actor.role === "admin" ? input.actor.schoolId : input.schoolId;
+  let query = getSupabaseAdminClient()
+    .from("school_map_settings")
+    .select("school_id, dispatch_latitude, dispatch_longitude")
+    .order("school_id", { ascending: true });
+
+  if (scopeSchoolId) {
+    query = query.eq("school_id", scopeSchoolId);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    throw new HttpError(500, error.message, "school_map_settings_list_failed");
+  }
+
+  const rows = (data ?? []) as RecordMap[];
+  const mappedRows = rows
+    .map((row) => ({
+      schoolId: asString(row.school_id),
+      latitude: asNumber(row.dispatch_latitude),
+      longitude: asNumber(row.dispatch_longitude)
+    }))
+    .filter((row) => row.schoolId && row.latitude != null && row.longitude != null);
+
+  const schoolIds = mappedRows.map((row) => row.schoolId);
+  const nameBySchool = new Map<string, string>();
+  if (schoolIds.length > 0) {
+    const { data: schools, error: schoolsError } = await getSupabaseAdminClient()
+      .from("schools")
+      .select("id, name")
+      .in("id", schoolIds);
+
+    if (schoolsError) {
+      throw new HttpError(500, schoolsError.message, "schools_name_list_failed");
+    }
+
+    for (const school of (schools ?? []) as RecordMap[]) {
+      const schoolId = asString(school.id);
+      if (!schoolId) {
+        continue;
+      }
+      nameBySchool.set(schoolId, asString(school.name));
+    }
+  }
+
+  const locations: SchoolDispatchLocation[] = mappedRows.map((row) => ({
+    schoolId: row.schoolId,
+    schoolName: nameBySchool.get(row.schoolId) || undefined,
+    latitude: row.latitude!,
+    longitude: row.longitude!
+  }));
+
+  return locations;
 }
 
 export async function getParentLiveTrip(input: {

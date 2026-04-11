@@ -2,11 +2,12 @@ import { Router, type Request, type Router as ExpressRouter } from "express";
 
 import type {
   DriversLiveMapResponse,
-  RealtimeEventsResponse
+  RealtimeEventsResponse,
+  SchoolDispatchLocationsResponse
 } from "@school-bus/shared";
 
 import { asyncHandler, HttpError } from "../../lib/http.js";
-import { listLiveDrivers } from "../../lib/map-data.js";
+import { listLiveDrivers, listSchoolDispatchLocations } from "../../lib/map-data.js";
 import { listRealtimeEvents, subscribeRealtimeEvents } from "../../lib/realtime.js";
 import { assertUserCanAccessTrip, getUserProfileById } from "../../lib/data.js";
 import { verifyStreamToken } from "../../lib/stream-token.js";
@@ -120,6 +121,19 @@ mapsRouter.get("/super-admin/drivers/live", requireRole("super_admin"), asyncHan
 
   const payload: DriversLiveMapResponse = {
     drivers
+  };
+  response.json(payload);
+}));
+
+mapsRouter.get("/schools/dispatch-locations", requireRole("admin", "super_admin"), asyncHandler(async (request, response) => {
+  const schoolId = typeof request.query.schoolId === "string" ? request.query.schoolId : undefined;
+  const schools = await listSchoolDispatchLocations({
+    actor: request.currentUser!,
+    schoolId
+  });
+
+  const payload: SchoolDispatchLocationsResponse = {
+    schools
   };
   response.json(payload);
 }));

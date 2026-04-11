@@ -8,14 +8,14 @@ import { useResource } from "../../core/useResource";
 export function SchoolsPage() {
   const currentUser = useRequiredAdminUser();
   const [name, setName] = useState("");
-  const [timezone, setTimezone] = useState("Asia/Kolkata");
+  const [address, setAddress] = useState("");
   const [editName, setEditName] = useState("");
-  const [editTimezone, setEditTimezone] = useState("Asia/Kolkata");
+  const [editAddress, setEditAddress] = useState("");
   const [feedback, setFeedback] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
   const [editId, setEditId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<"name" | "timezone" | "id">("name");
+  const [sortBy, setSortBy] = useState<"name" | "address" | "id">("name");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
   const { data, isLoading, error } = useResource(
@@ -31,7 +31,7 @@ export function SchoolsPage() {
     }
 
     return items.filter((school) =>
-      [school.id, school.name, school.timezone]
+      [school.id, school.name, school.address]
         .filter((value) => value != null)
         .some((value) => String(value).toLowerCase().includes(query))
     );
@@ -40,12 +40,12 @@ export function SchoolsPage() {
   const sortedSchools = useMemo(() => {
     const items = [...filteredSchools];
     const getName = (school: Record<string, unknown>) => String(school.name ?? "");
-    const getTimezone = (school: Record<string, unknown>) => String(school.timezone ?? "");
+    const getAddress = (school: Record<string, unknown>) => String(school.address ?? "");
     const getId = (school: Record<string, unknown>) => String(school.id ?? "");
 
     items.sort((left, right) => {
-      const leftValue = sortBy === "name" ? getName(left) : sortBy === "timezone" ? getTimezone(left) : getId(left);
-      const rightValue = sortBy === "name" ? getName(right) : sortBy === "timezone" ? getTimezone(right) : getId(right);
+      const leftValue = sortBy === "name" ? getName(left) : sortBy === "address" ? getAddress(left) : getId(left);
+      const rightValue = sortBy === "name" ? getName(right) : sortBy === "address" ? getAddress(right) : getId(right);
 
       const comparison = leftValue.localeCompare(rightValue, undefined, { numeric: true, sensitivity: "base" });
       return sortDirection === "asc" ? comparison : -comparison;
@@ -57,7 +57,7 @@ export function SchoolsPage() {
   function resetEditForm() {
     setEditId(null);
     setEditName("");
-    setEditTimezone("Asia/Kolkata");
+    setEditAddress("");
   }
 
   useEffect(() => {
@@ -84,10 +84,10 @@ export function SchoolsPage() {
     try {
       await createSchool(currentUser, {
         name: name.trim(),
-        timezone: timezone.trim() || "Asia/Kolkata"
+        address: address.trim() || undefined
       });
       setName("");
-      setTimezone("Asia/Kolkata");
+      setAddress("");
       setFeedback("School created.");
       setReloadKey((value) => value + 1);
     } catch (createError) {
@@ -118,7 +118,7 @@ export function SchoolsPage() {
     try {
       await updateSchool(currentUser, editId, {
         name: editName.trim(),
-        timezone: editTimezone.trim() || "Asia/Kolkata"
+        address: editAddress.trim() || undefined
       });
       setFeedback("School updated.");
       resetEditForm();
@@ -156,9 +156,9 @@ export function SchoolsPage() {
           />
           <input
             className="resource-input"
-            onChange={(event) => setTimezone(event.target.value)}
-            placeholder="Timezone"
-            value={timezone}
+            onChange={(event) => setAddress(event.target.value)}
+            placeholder="Address"
+            value={address}
           />
           <button className="resource-action" onClick={handleCreateSchool} type="button">
             Create School
@@ -182,9 +182,9 @@ export function SchoolsPage() {
         {data && filteredSchools.length > 0 && (
           <div className="table-shell">
             <div className="resource-actions-row" style={{ marginBottom: 12 }}>
-              <select className="resource-input" onChange={(event) => setSortBy(event.target.value as "name" | "timezone" | "id")} value={sortBy}>
+              <select className="resource-input" onChange={(event) => setSortBy(event.target.value as "name" | "address" | "id")} value={sortBy}>
                 <option value="name">Sort: Name</option>
-                <option value="timezone">Sort: Timezone</option>
+                <option value="address">Sort: Address</option>
                 <option value="id">Sort: ID</option>
               </select>
               <select className="resource-input" onChange={(event) => setSortDirection(event.target.value as "asc" | "desc")} value={sortDirection}>
@@ -197,7 +197,7 @@ export function SchoolsPage() {
                 <tr>
                   <th>ID</th>
                   <th>Name</th>
-                  <th>Timezone</th>
+                  <th>Address</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -206,7 +206,7 @@ export function SchoolsPage() {
                   <tr key={String(school.id ?? school.name ?? Math.random())}>
                     <td>{String(school.id ?? "n/a")}</td>
                     <td>{String(school.name ?? "Unnamed School")}</td>
-                    <td>{String(school.timezone ?? "n/a")}</td>
+                    <td>{String(school.address ?? "n/a")}</td>
                     <td>
                       {school.id != null && (
                         <button
@@ -214,7 +214,7 @@ export function SchoolsPage() {
                           onClick={() => {
                             setEditId(String(school.id));
                             setEditName(String(school.name ?? ""));
-                            setEditTimezone(String(school.timezone ?? "Asia/Kolkata"));
+                            setEditAddress(String(school.address ?? ""));
                           }}
                           type="button"
                         >
@@ -263,9 +263,9 @@ export function SchoolsPage() {
               />
               <input
                 className="resource-input"
-                onChange={(event) => setEditTimezone(event.target.value)}
-                placeholder="Timezone"
-                value={editTimezone}
+                onChange={(event) => setEditAddress(event.target.value)}
+                placeholder="Address"
+                value={editAddress}
               />
             </div>
             <div className="resource-actions-row edit-overlay-actions">

@@ -760,6 +760,10 @@ textarea:focus-visible {
   overflow: auto;
 }
 
+.edit-overlay-dialog .resource-form {
+  grid-template-columns: 1fr;
+}
+
 .edit-overlay-actions {
   justify-content: flex-end;
   margin-bottom: 0;

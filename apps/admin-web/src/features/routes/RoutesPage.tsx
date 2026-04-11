@@ -18,14 +18,18 @@ export function RoutesPage() {
       updateResource={updateRoute}
       deleteResource={deleteRoute}
       createTemplate={{
-        name: "",
-        code: "",
+        route_name: "",
+        route_code: "",
+        direction: "pickup",
+        description: "",
         status: "active",
         school_id: ""
       }}
       fields={[
-        { key: "name", label: "Name", placeholder: "Route name", required: true },
-        { key: "code", label: "Code", placeholder: "Route code" },
+        { key: "route_name", label: "Name", placeholder: "Route name", required: true },
+        { key: "route_code", label: "Code", placeholder: "Route code" },
+        { key: "direction", label: "Direction", placeholder: "pickup or drop" },
+        { key: "description", label: "Description", placeholder: "Route description" },
         { key: "status", label: "Status", placeholder: "active" },
         { key: "school_id", label: "School", placeholder: "School ID (super admin only)" }
       ]}

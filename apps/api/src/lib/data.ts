@@ -58,7 +58,7 @@ function mapUserProfile(row: RecordMap): UserProfile {
     schoolId: asString(row.school_id),
     role: (row.role as UserProfile["role"]) ?? "parent",
     fullName: asString(row.full_name, "Unknown User"),
-    phoneE164: asString(row.phone_e164),
+    phoneE164: asString(row.phone_e164 || row.phone_number),
     email: typeof row.email === "string" ? row.email : undefined
   };
 }
@@ -127,11 +127,12 @@ function mapAttendanceRecord(row: RecordMap): AttendanceRecord {
 }
 
 function mapAlertRecord(row: RecordMap): AlertRecord {
+  const type = (row.type ?? row.alert_type) as AlertRecord["type"];
   return {
     id: asString(row.id),
     schoolId: asString(row.school_id),
     tripId: typeof row.trip_id === "string" ? row.trip_id : undefined,
-    type: row.type as AlertRecord["type"],
+    type,
     severity: (row.severity as AlertSeverity) ?? "medium",
     status: (row.status as AlertStatus) ?? "open",
     message: asString(row.message),
@@ -908,12 +909,31 @@ async function countRows(table: string, schoolId?: string, filters: Record<strin
 }
 
 export async function getDashboardSummary(schoolId?: string): Promise<DashboardSummary> {
-  const [activeTrips, delayedTrips, unresolvedAlerts, onboardStudents] = await Promise.all([
+  const [activeTrips, unresolvedAlerts, onboardStudents] = await Promise.all([
     countRows("trips", schoolId, { status: "active" }),
-    countRows("alerts", schoolId, { type: "delay", status: "open" }),
     countRows("alerts", schoolId, { status: "open" }),
     countRows("attendance_events", schoolId, { event_type: "boarded" })
   ]);
+
+  let delayedTrips = 0;
+  {
+    let query = getSupabaseAdminClient()
+      .from("alerts")
+      .select("status, type, alert_type");
+    if (schoolId) {
+      query = query.eq("school_id", schoolId);
+    }
+    const { data, error } = await query;
+    if (error) {
+      throw new HttpError(500, error.message, "dashboard_delay_alerts_failed");
+    }
+    delayedTrips = (data ?? []).filter((row) => {
+      const mapped = row as RecordMap;
+      const alertType = asString(mapped.alert_type || mapped.type).toLowerCase();
+      const status = asString(mapped.status).toLowerCase();
+      return alertType === "delay" && status === "open";
+    }).length;
+  }
 
   return {
     activeTrips,
@@ -962,15 +982,79 @@ export type AdminResource = keyof typeof adminCollectionMap;
 type AdminResourcePayload = Record<string, unknown>;
 
 const adminResourceFieldMap: Record<AdminResource, readonly string[]> = {
-  schools: ["name", "timezone"],
-  users: ["full_name", "role", "status", "school_id"],
-  routes: ["name", "code", "status", "school_id"],
-  stops: ["name", "code", "address", "status", "school_id"],
-  buses: ["label", "registration_no", "capacity", "status", "school_id"],
-  drivers: ["user_id", "license_no", "status", "school_id"],
-  students: ["full_name", "grade", "address_text", "status", "school_id"],
+  schools: ["name", "address", "latitude", "longitude", "is_active", "school_id"],
+  users: ["full_name", "role", "is_active", "school_id", "phone_number", "email"],
+  routes: ["route_name", "route_code", "description", "direction", "status", "school_id"],
+  stops: ["stop_name", "address", "latitude", "longitude", "route_id", "sequence_order", "school_id", "is_active"],
+  buses: ["bus_number", "vehicle_number", "capacity", "status", "driver_id", "route_id", "gps_device_id", "school_id", "is_active"],
+  drivers: ["user_id", "full_name", "phone_number", "email", "license_number", "status", "assigned_bus_id", "school_id", "is_active"],
+  students: ["first_name", "last_name", "grade", "class", "section", "roll_number", "pickup_stop_id", "drop_stop_id", "route_id", "assigned_bus_id", "transport_status", "home_address", "latitude", "longitude", "school_id", "is_active"],
   assignments: ["student_id", "route_id", "stop_id", "bus_id", "status", "school_id"]
 };
+
+function applyAdminResourceAliases(resource: AdminResource, payload: AdminResourcePayload) {
+  const normalized: Record<string, unknown> = { ...payload };
+
+  if (resource === "users") {
+    if (normalized.status != null && normalized.is_active == null) {
+      const status = asTrimmedString(normalized.status).toLowerCase();
+      normalized.is_active = status === "active" || status === "true" || status === "1";
+    }
+  }
+
+  if (resource === "routes") {
+    if (normalized.name != null && normalized.route_name == null) {
+      normalized.route_name = normalized.name;
+    }
+    if (normalized.code != null && normalized.route_code == null) {
+      normalized.route_code = normalized.code;
+    }
+  }
+
+  if (resource === "stops") {
+    if (normalized.name != null && normalized.stop_name == null) {
+      normalized.stop_name = normalized.name;
+    }
+  }
+
+  if (resource === "buses") {
+    if (normalized.label != null && normalized.bus_number == null) {
+      normalized.bus_number = normalized.label;
+    }
+    if (normalized.registration_no != null && normalized.vehicle_number == null) {
+      normalized.vehicle_number = normalized.registration_no;
+    }
+  }
+
+  if (resource === "drivers") {
+    if (normalized.license_no != null && normalized.license_number == null) {
+      normalized.license_number = normalized.license_no;
+    }
+    if (normalized.status != null && normalized.is_active == null) {
+      const status = asTrimmedString(normalized.status).toLowerCase();
+      normalized.is_active = status === "active" || status === "true" || status === "1";
+    }
+  }
+
+  if (resource === "students") {
+    if (normalized.address_text != null && normalized.home_address == null) {
+      normalized.home_address = normalized.address_text;
+    }
+    if (normalized.status != null && normalized.transport_status == null) {
+      normalized.transport_status = normalized.status;
+    }
+    if (normalized.full_name != null && (normalized.first_name == null || normalized.last_name == null)) {
+      const fullName = asTrimmedString(normalized.full_name);
+      if (fullName) {
+        const [first, ...rest] = fullName.split(" ");
+        normalized.first_name = normalized.first_name ?? first;
+        normalized.last_name = normalized.last_name ?? (rest.join(" ") || first);
+      }
+    }
+  }
+
+  return normalized;
+}
 
 function asTrimmedString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -981,11 +1065,12 @@ function sanitizeAdminResourcePayload(
   payload: AdminResourcePayload,
   schoolId: string | undefined
 ) {
+  const normalizedPayload = applyAdminResourceAliases(resource, payload);
   const allowedFields = adminResourceFieldMap[resource];
   const sanitized: Record<string, unknown> = {};
 
   for (const field of allowedFields) {
-    const value = payload[field];
+    const value = normalizedPayload[field];
     if (typeof value === "string") {
       const trimmed = value.trim();
       if (trimmed.length > 0) {
@@ -1000,7 +1085,7 @@ function sanitizeAdminResourcePayload(
   }
 
   if (resource !== "schools") {
-    const scopedSchoolId = asTrimmedString(payload.school_id) || asTrimmedString(schoolId);
+    const scopedSchoolId = asTrimmedString(normalizedPayload.school_id) || asTrimmedString(schoolId);
     if (!scopedSchoolId) {
       throw new HttpError(400, "school_id is required", "missing_school_id");
     }

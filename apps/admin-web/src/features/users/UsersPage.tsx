@@ -123,7 +123,7 @@ export function UsersPage() {
         full_name: fullName.trim(),
         role,
         school_id: currentUser.role === "super_admin" ? (schoolId.trim() || undefined) : currentUser.schoolId,
-        status: "active"
+        is_active: true
       });
       resetCreateForm();
       setFeedback("User created.");
@@ -159,7 +159,7 @@ export function UsersPage() {
         full_name: editFullName.trim(),
         role: editRole,
         school_id: currentUser.role === "super_admin" ? (editSchoolId.trim() || undefined) : undefined,
-        status: "active"
+        is_active: true
       });
       resetEditForm();
       setFeedback("User updated.");
@@ -254,9 +254,10 @@ export function UsersPage() {
               <thead>
                 <tr>
                   <th>ID</th>
-                  <th>Name</th>
+                  <th>Full Name</th>
                   <th>Role</th>
-                  <th>School</th>
+                  <th>School ID</th>
+                  <th>Active</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -267,6 +268,7 @@ export function UsersPage() {
                     <td>{String(user.full_name ?? user.name ?? "Unnamed User")}</td>
                     <td>{String(user.role ?? "n/a")}</td>
                     <td>{String(user.school_id ?? currentUser.schoolId ?? "global")}</td>
+                    <td>{user.is_active === false ? "No" : "Yes"}</td>
                     <td>
                       {user.id != null && (
                         <button

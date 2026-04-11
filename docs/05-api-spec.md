@@ -119,3 +119,48 @@
 - Role + school scope are enforced in both:
   - API middleware/business checks
   - Supabase RLS policies
+
+## Backward Compatibility & Schema Migration (April 2026)
+
+### Field Aliasing for Seamless Migration
+
+The backend automatically normalizes old field names to new canonical schema names. Clients can use either naming convention during the migration period.
+
+**Driver Field Aliases**
+- `license_no` → `license_number`
+- `status` → `is_active` (string to boolean conversion)
+
+**Student Field Aliases**
+- `address_text` → `home_address`
+- `status` → `transport_status`
+- `full_name` → `first_name` + `last_name` (auto-split)
+- `lat`/`lng` → `latitude`/`longitude`
+
+**Route Field Aliases**
+- `name` → `route_name`
+- `code` → `route_code`
+
+**Stop Field Aliases**
+- `name` → `stop_name`
+
+**Bus Field Aliases**
+- `label` → `bus_number`
+- `registration_no` → `vehicle_number`
+
+**User Field Aliases**
+- `status` → `is_active` (string to boolean conversion)
+
+**School Field Aliases**
+- `timezone` → `address`
+
+### Response Parsing Strategy
+
+Mobile apps and client code should handle both old and new field names in API responses:
+```typescript
+// Fallback pattern for field access
+const fullName = response.full_name ?? response.fullName;
+const address = response.home_address ?? response.address_text;
+const latitude = response.latitude ?? response.lat;
+```
+
+All API responses maintain backward compatibility - old field names will continue to appear during the migration period.

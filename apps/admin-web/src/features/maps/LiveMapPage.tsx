@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { RealtimeEventEnvelope } from "@school-bus/shared";
+import { importLibrary, setOptions } from "@googlemaps/js-api-loader";
 
 import { AppShell } from "../../app/AppShell";
 import {
   bulkGeocodeStudentsBySchool,
   getSchoolMapSettings,
+  listSchoolDispatchLocations,
   listRealtimeMapEvents,
   listLiveDriversMap,
   optimizeSchoolRoutesDaily,
@@ -24,20 +26,23 @@ declare global {
         Marker: new (options: Record<string, unknown>) => {
           setMap: (map: unknown) => void;
         };
+        SymbolPath?: {
+          CIRCLE: number;
+        };
       };
     };
   }
 }
 
-let googleMapsScriptPromise: Promise<void> | null = null;
+let googleMapsLoaderPromise: Promise<void> | null = null;
 
 function loadGoogleMapsScript() {
   if (window.google?.maps) {
     return Promise.resolve();
   }
 
-  if (googleMapsScriptPromise) {
-    return googleMapsScriptPromise;
+  if (googleMapsLoaderPromise) {
+    return googleMapsLoaderPromise;
   }
 
   const apiKey = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined)?.trim();
@@ -45,17 +50,16 @@ function loadGoogleMapsScript() {
     return Promise.reject(new Error("Missing VITE_GOOGLE_MAPS_API_KEY"));
   }
 
-  googleMapsScriptPromise = new Promise<void>((resolve, reject) => {
-    const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}`;
-    script.async = true;
-    script.defer = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Failed to load Google Maps script"));
-    document.head.appendChild(script);
+  setOptions({
+    key: apiKey,
+    v: "weekly"
   });
 
-  return googleMapsScriptPromise;
+  googleMapsLoaderPromise = Promise.all([
+    importLibrary("maps"),
+    importLibrary("marker")
+  ]).then(() => undefined);
+  return googleMapsLoaderPromise;
 }
 
 export function LiveMapPage() {
@@ -104,6 +108,10 @@ export function LiveMapPage() {
     () => schoolScope ? getSchoolMapSettings(currentUser, schoolScope) : Promise.resolve(undefined),
     [currentUser.id, currentUser.role, schoolScope, refreshTick]
   );
+  const { data: schoolLocationsData } = useResource(
+    () => listSchoolDispatchLocations(currentUser, schoolScope),
+    [currentUser.id, currentUser.role, schoolScope, refreshTick]
+  );
 
   useEffect(() => {
     const settings = settingsData?.settings;
@@ -117,6 +125,7 @@ export function LiveMapPage() {
 
   const delayedCount = data?.drivers.filter((driver) => driver.isDelayed).length ?? 0;
   const driverCount = data?.drivers.length ?? 0;
+  const schoolLocationCount = schoolLocationsData?.schools.length ?? 0;
   const baseEvents = (eventsData?.events ?? []) as RealtimeEventEnvelope[];
   const recentEvents = baseEvents
     .filter((event) => (selectedTripId ? event.tripId === selectedTripId : true))
@@ -161,32 +170,54 @@ export function LiveMapPage() {
   }, [data?.drivers]);
 
   useEffect(() => {
-    if (!data?.drivers?.length || !mapContainerRef.current) {
+    if (!mapContainerRef.current) {
       return;
     }
 
-    const driversWithCoords = data.drivers.filter((driver) => driver.latitude != null && driver.longitude != null);
-    if (!driversWithCoords.length) {
-      return;
-    }
+    const driversWithCoords = (data?.drivers ?? []).filter((driver) => driver.latitude != null && driver.longitude != null);
+    const schoolsWithCoords = (schoolLocationsData?.schools ?? []).filter((school) => school.latitude != null && school.longitude != null);
+    const settingsCenter = settingsData?.settings;
+    const defaultCenter = {
+      lat: settingsCenter?.dispatchLatitude ?? 13.0827,
+      lng: settingsCenter?.dispatchLongitude ?? 80.2707
+    };
 
     let isDisposed = false;
     const markers: Array<{ setMap: (map: unknown) => void }> = [];
     void loadGoogleMapsScript()
       .then(() => {
-        if (isDisposed || !window.google?.maps || !mapContainerRef.current) {
+        const mapElement = mapContainerRef.current;
+        if (isDisposed || !window.google?.maps || !mapElement) {
           return;
         }
-
-        const first = driversWithCoords[0]!;
-        const map = new window.google.maps.Map(mapContainerRef.current, {
-          center: { lat: first.latitude!, lng: first.longitude! },
-          zoom: currentUser.role === "super_admin" ? 10 : 13,
+        setMapError(undefined);
+        const first = driversWithCoords[0];
+        const firstSchool = schoolsWithCoords[0];
+        const center = first
+          ? { lat: first.latitude!, lng: first.longitude! }
+          : firstSchool
+            ? { lat: firstSchool.latitude, lng: firstSchool.longitude }
+          : defaultCenter;
+        const map = new window.google.maps.Map(mapElement, {
+          center,
+          zoom: driversWithCoords.length
+            ? (currentUser.role === "super_admin" ? 10 : 13)
+            : 11,
           mapTypeControl: false,
           streetViewControl: false
         });
 
-        if (currentUser.role === "super_admin" && !schoolScope) {
+        for (const school of schoolsWithCoords) {
+          const marker = new window.google.maps.Marker({
+            map,
+            position: { lat: school.latitude, lng: school.longitude },
+            title: `School: ${school.schoolName ?? school.schoolId}`,
+            label: "S"
+          });
+          markers.push(marker);
+        }
+
+        if (currentUser.role === "super_admin" && !schoolScope && driverClusters.length > 0) {
           for (const cluster of driverClusters) {
             const marker = new window.google.maps.Marker({
               map,
@@ -196,7 +227,6 @@ export function LiveMapPage() {
             });
             markers.push(marker);
           }
-          return;
         }
 
         for (const driver of driversWithCoords) {
@@ -221,7 +251,7 @@ export function LiveMapPage() {
         marker.setMap(null);
       }
     };
-  }, [currentUser.role, data?.drivers, driverClusters, schoolScope]);
+  }, [currentUser.role, data?.drivers, driverClusters, schoolLocationsData?.schools, schoolScope, settingsData?.settings]);
 
   async function runBulkGeocode() {
     if (!schoolScope) {
@@ -316,6 +346,7 @@ export function LiveMapPage() {
         />
         <MetricCard label="Refresh Interval" value="10s" />
         <MetricCard label="Realtime Stream" value="Polling" />
+        <MetricCard label="School Markers" value={String(schoolLocationCount)} />
       </section>
 
       <section className="resource-panel">
