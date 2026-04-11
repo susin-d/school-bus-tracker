@@ -1,17 +1,27 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 import { useAdminSession } from "../../core/auth";
+import { useAdminRouter } from "../../core/router";
 
 export function AdminAuthScreen() {
   const {
     signInWithEmailPassword,
+    currentUser,
     authError,
     clearAuthError,
     isLoading
   } = useAdminSession();
+  const { navigate } = useAdminRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const canSubmit = email.trim().length > 3 && password.length > 0;
+
+  useEffect(() => {
+    if (currentUser) {
+      navigate("dashboard");
+    }
+  }, [currentUser, navigate]);
 
   async function handleSignIn(event?: FormEvent) {
     event?.preventDefault();
@@ -50,9 +60,19 @@ export function AdminAuthScreen() {
             className="resource-input"
             onChange={(event) => setPassword(event.target.value)}
             placeholder="Enter your password"
-            type="password"
+            type={showPassword ? "text" : "password"}
             value={password}
           />
+          <label className="auth-input-label" htmlFor="admin-login-show-password">
+            <input
+              id="admin-login-show-password"
+              onChange={(event) => setShowPassword(event.target.checked)}
+              type="checkbox"
+              checked={showPassword}
+            />
+            {" "}
+            Show password
+          </label>
           <button
             className="resource-action"
             disabled={isLoading || !canSubmit}

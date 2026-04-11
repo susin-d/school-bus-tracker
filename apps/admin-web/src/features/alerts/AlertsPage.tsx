@@ -10,10 +10,18 @@ export function AlertsPage() {
   const currentUser = useRequiredAdminUser();
   const [feedback, setFeedback] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [severityFilter, setSeverityFilter] = useState("all");
   const { data, isLoading, error } = useResource(
     () => listAlerts(currentUser),
     [currentUser.id, reloadKey]
   );
+
+  const filteredAlerts = (data?.alerts ?? []).filter((alert) => {
+    const statusMatches = statusFilter === "all" || alert.status === statusFilter;
+    const severityMatches = severityFilter === "all" || alert.severity === severityFilter;
+    return statusMatches && severityMatches;
+  });
 
   async function handleAcknowledge(alertId: string) {
     try {
@@ -48,18 +56,44 @@ export function AlertsPage() {
       <section className="panel-grid compact" style={{ marginTop: 20 }}>
         <AlertsOverview view={currentUser.role === "super_admin" ? "super_admin" : "school_admin"} />
       </section>
-      <section className="resource-panel">
+      <section className="resource-panel resource-workspace">
         <header className="resource-header">
           <div>
             <p className="eyebrow">Live Data</p>
             <h2>Open and Recent Alerts</h2>
           </div>
+          <div className="resource-actions-row">
+            <select className="resource-input" onChange={(event) => setStatusFilter(event.target.value)} value={statusFilter}>
+              <option value="all">All statuses</option>
+              <option value="open">Open</option>
+              <option value="acknowledged">Acknowledged</option>
+              <option value="resolved">Resolved</option>
+            </select>
+            <select className="resource-input" onChange={(event) => setSeverityFilter(event.target.value)} value={severityFilter}>
+              <option value="all">All severities</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="critical">Critical</option>
+            </select>
+          </div>
         </header>
+
+        <div className="resource-meta">
+          <span>{filteredAlerts.length} visible</span>
+          <span>{data?.alerts.length ?? 0} total</span>
+        </div>
 
         {isLoading && <p className="panel-summary">Loading alerts from the backend.</p>}
         {error && <p className="panel-summary error-copy">{error}</p>}
-        {feedback && <p className="panel-summary">{feedback}</p>}
-        {data && (
+        {feedback && <p className="panel-summary" role="status">{feedback}</p>}
+        {data && filteredAlerts.length === 0 && (
+          <div className="empty-state">
+            <strong>No alerts match the current filters.</strong>
+            <span>Try a different severity or status filter.</span>
+          </div>
+        )}
+        {data && filteredAlerts.length > 0 && (
           <div className="table-shell">
             <table className="resource-table">
               <thead>
@@ -72,7 +106,7 @@ export function AlertsPage() {
                 </tr>
               </thead>
               <tbody>
-                {data.alerts.map((alert) => (
+                {filteredAlerts.map((alert) => (
                   <tr key={alert.id}>
                     <td>{alert.type}</td>
                     <td>{alert.severity}</td>

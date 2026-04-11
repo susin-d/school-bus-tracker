@@ -8,55 +8,113 @@ import { roleContent, screenPlan } from "../shared/content";
 export function DashboardPage() {
   const currentUser = useRequiredAdminUser();
   const { navigate } = useAdminRouter();
-  const { data, isLoading, error } = useResource(
-    () => getDashboard(currentUser),
-    [currentUser.id]
-  );
+  const { data, isLoading, error } = useResource(() => getDashboard(currentUser), [currentUser.id]);
   const {
     data: plannerRuns,
     isLoading: isPlannerRunsLoading,
     error: plannerRunsError
-  } = useResource(
-    () => listPlannerRuns(currentUser, 12),
-    [currentUser.id]
-  );
+  } = useResource(() => listPlannerRuns(currentUser, 12), [currentUser.id]);
 
   const view = currentUser.role === "super_admin" ? "super_admin" : "school_admin";
   const content = roleContent[view];
+  const unresolvedAlerts = data?.unresolvedAlerts ?? 0;
+  const delayedTrips = data?.delayedTrips ?? 0;
+  const activeTrips = data?.activeTrips ?? 0;
+  const onboardStudents = data?.onboardStudents ?? 0;
+  const plannerRunsCount = plannerRuns?.runs.length ?? 0;
 
   return (
     <AppShell title={content.title} subtitle={content.subtitle} activeRoute="dashboard">
-      <section className="dashboard-toolbar">
-        <p className="dashboard-toolbar-note">
-          Good morning. Here is your live operations pulse for today.
-        </p>
-        <div className="dashboard-toolbar-actions">
-          <button className="subnav-link" onClick={() => navigate("liveMap")} type="button">
-            Open Live Map
-          </button>
-          <button className="resource-action" onClick={() => navigate("alerts")} type="button">
-            Review Alerts
-          </button>
-        </div>
+      <section className="dashboard-hero-grid">
+        <article className="panel dashboard-hero-card">
+          <p className="eyebrow">Live Operations</p>
+          <h2>Today’s control center</h2>
+          <p className="panel-summary">
+            Track the highest-priority transport signals first, then move into alerts,
+            route planning, and record management.
+          </p>
+          <div className="dashboard-toolbar-actions">
+            <button className="subnav-link" onClick={() => navigate("liveMap")} type="button">
+              Open Live Map
+            </button>
+            <button className="resource-action" onClick={() => navigate("alerts")} type="button">
+              Review Alerts
+            </button>
+          </div>
+        </article>
+
+        <article className="panel dashboard-status-card">
+          <div className="dashboard-status-grid">
+            <MetricCard label="Active Trips" value={String(activeTrips)} helper="Vehicles in motion" />
+            <MetricCard
+              label="Delayed Trips"
+              value={String(delayedTrips)}
+              helper="Behind schedule"
+              tone="warm"
+            />
+            <MetricCard
+              label="Students Onboard"
+              value={String(onboardStudents)}
+              helper="Live tracked riders"
+            />
+            <MetricCard
+              label="Unresolved Alerts"
+              value={String(unresolvedAlerts)}
+              helper="Needs action now"
+              tone="warm"
+            />
+          </div>
+        </article>
       </section>
 
-      <section className="stats-grid">
-        {isLoading && <LoadingPanel title="Loading dashboard" body="Pulling operational metrics from the API." />}
-        {error && <ErrorPanel title="Dashboard unavailable" body={error} />}
-        {data && (
-          <>
-            <MetricCard label="Active Trips" value={String(data.activeTrips)} helper="Vehicles currently in progress" />
-            <MetricCard label="Delayed Trips" value={String(data.delayedTrips)} helper="Routes behind schedule" tone="warm" />
-            <MetricCard label="Students Onboard" value={String(data.onboardStudents)} helper="Live tracked riders" />
-            <MetricCard label="Unresolved Alerts" value={String(data.unresolvedAlerts)} helper="Needs immediate action" tone="warm" />
-          </>
-        )}
+      <section className="dashboard-work-grid">
+        <article className="panel dashboard-work-panel">
+          <div className="resource-header">
+            <div>
+              <p className="eyebrow">Priority Work</p>
+              <h2>What needs attention</h2>
+            </div>
+          </div>
+          {isLoading && (
+            <LoadingPanel title="Loading dashboard" body="Pulling operational metrics from the API." />
+          )}
+          {error && <ErrorPanel title="Dashboard unavailable" body={error} />}
+          {data && (
+            <div className="dashboard-priority-list">
+              <PriorityRow label="Open alerts" value={String(unresolvedAlerts)} tone="warm" />
+              <PriorityRow label="Delayed trips" value={String(delayedTrips)} />
+              <PriorityRow label="Planning runs" value={String(plannerRunsCount)} />
+            </div>
+          )}
+        </article>
+
+        <article className="panel dashboard-work-panel">
+          <div className="resource-header">
+            <div>
+              <p className="eyebrow">Role Focus</p>
+              <h2>Operational modules</h2>
+            </div>
+          </div>
+          <div className="dashboard-module-grid">
+            {content.primaryModules.map((module) => (
+              <article className="dashboard-module-card" key={module.title}>
+                <h3 className="dashboard-module-title">{module.title}</h3>
+                <p className="panel-summary">{module.summary}</p>
+                <ul className="stack-list">
+                  {module.bullets.map((bullet) => (
+                    <li key={bullet}>{bullet}</li>
+                  ))}
+                </ul>
+              </article>
+            ))}
+          </div>
+        </article>
       </section>
 
-      <section className="panel-grid">
-        {content.primaryModules.map((module) => (
-          <article className="panel dashboard-module-card" key={module.title}>
-            <h2 className="dashboard-module-title">{module.title}</h2>
+      <section className="panel-grid dashboard-secondary-grid">
+        {content.secondaryModules.map((module) => (
+          <article className="panel dashboard-support-card" key={module.title}>
+            <h2>{module.title}</h2>
             <p className="panel-summary">{module.summary}</p>
             <ul className="stack-list">
               {module.bullets.map((bullet) => (
@@ -67,11 +125,11 @@ export function DashboardPage() {
         ))}
       </section>
 
-      <section className="resource-panel" style={{ marginTop: 20 }}>
+      <section className="resource-panel dashboard-reference-panel" style={{ marginTop: 20 }}>
         <header className="resource-header">
           <div>
             <p className="eyebrow">Product Coverage</p>
-            <h2>Screen Plan</h2>
+            <h2>Screen plan</h2>
           </div>
         </header>
         <div className="panel-grid compact">
@@ -109,9 +167,7 @@ export function DashboardPage() {
             <h2>Nightly + Manual Route Planning Runs</h2>
           </div>
         </header>
-        {isPlannerRunsLoading && (
-          <p className="panel-summary">Loading planner run history.</p>
-        )}
+        {isPlannerRunsLoading && <p className="panel-summary">Loading planner run history.</p>}
         {plannerRunsError && <p className="panel-summary error-copy">{plannerRunsError}</p>}
         {plannerRuns && plannerRuns.runs.length > 0 && (
           <div className="table-shell">
@@ -149,6 +205,9 @@ export function DashboardPage() {
         )}
         {plannerRuns && plannerRuns.runs.length === 0 && (
           <p className="panel-summary">No planner runs yet. Scheduled and manual runs will appear here.</p>
+        )}
+        {!plannerRuns && !isPlannerRunsLoading && !plannerRunsError && (
+          <p className="panel-summary">Planner history will appear here once route generation begins.</p>
         )}
       </section>
     </AppShell>
@@ -190,6 +249,23 @@ function ErrorPanel({ title, body }: { title: string; body: string }) {
       <h2>{title}</h2>
       <p className="panel-summary">{body}</p>
     </article>
+  );
+}
+
+function PriorityRow({
+  label,
+  value,
+  tone = "default"
+}: {
+  label: string;
+  value: string;
+  tone?: "default" | "warm";
+}) {
+  return (
+    <div className={tone === "warm" ? "priority-row warm" : "priority-row"}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
   );
 }
 

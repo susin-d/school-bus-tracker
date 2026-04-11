@@ -3,7 +3,6 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "ignoreDeprecations": "6.0",
     "lib": ["ES2022", "DOM"],
     "strict": true,
     "skipLibCheck": true,
@@ -11,10 +10,9 @@
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
-    "baseUrl": ".",
     "paths": {
-      "@school-bus/shared": ["packages/shared/src/index.ts"],
-      "@school-bus/shared/*": ["packages/shared/src/*"]
+      "@school-bus/shared": ["./packages/shared/src/index.ts"],
+      "@school-bus/shared/*": ["./packages/shared/src/*"]
     }
   }
 }

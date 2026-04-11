@@ -4,7 +4,6 @@ import ReactDOM from "react-dom/client";
 import { AdminApp } from "./AdminApp";
 import { AdminSessionProvider } from "./core/auth";
 import { AdminRouterProvider } from "./core/router";
-import "./theme/colors.css";
 import "./styles.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

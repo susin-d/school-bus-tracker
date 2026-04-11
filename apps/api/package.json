@@ -8,7 +8,7 @@
     "create:system-admin": "tsx src/scripts/create-system-admin.ts",
     "check:dependencies": "tsx src/scripts/check-dependencies.ts",
     "send:test-email": "tsx src/scripts/send-test-email.ts",
-    "dev": "tsx watch src/index.ts",
+    "dev": "node --env-file=.env --watch --import tsx src/index.ts",
     "lint": "tsc -b tsconfig.json --pretty false",
     "rls:seed": "tsx src/scripts/seed-rls-fixtures.ts",
     "start": "node --env-file=.env dist/index.js",

@@ -22,6 +22,15 @@ import { UsersPage } from "./features/users/UsersPage";
 export function AdminApp() {
   const { currentUser } = useAdminSession();
   const { currentRoute, navigate } = useAdminRouter();
+  const canAccessCurrentRoute = currentUser
+    ? canAccessRoute(currentUser.role, currentRoute)
+    : false;
+
+  useEffect(() => {
+    if (currentUser && !canAccessCurrentRoute) {
+      navigate("dashboard");
+    }
+  }, [canAccessCurrentRoute, currentUser, navigate]);
 
   if (currentRoute === "landing") {
     return <AdminLandingPage />;
@@ -34,14 +43,6 @@ export function AdminApp() {
   if (!currentUser) {
     return <AdminAuthScreen />;
   }
-
-  const canAccessCurrentRoute = canAccessRoute(currentUser.role, currentRoute);
-
-  useEffect(() => {
-    if (!canAccessCurrentRoute) {
-      navigate("dashboard");
-    }
-  }, [canAccessCurrentRoute, navigate]);
 
   if (!canAccessCurrentRoute) {
     return <DashboardPage />;
