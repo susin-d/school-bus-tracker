@@ -1,5 +1,5 @@
 import '../../core/api_client.dart';
-import '../../core/api_access.dart';
+import '../../core/app_state.dart';
 
 class AuthApi {
   AuthApi({String? baseUrl})
@@ -10,19 +10,13 @@ class AuthApi {
 
   final ApiClient _client;
 
-  Future<void> sendOtp(String phone) async {
-    await _client.post('/auth/otp/send', {
-      'phone': phone,
-    });
-  }
-
-  Future<VerifiedSession> verifyOtp({
-    required String phone,
-    required String otp,
+  Future<VerifiedSession> login({
+    required String email,
+    required String password,
   }) async {
-    final payload = await _client.post('/auth/otp/verify', {
-      'phone': phone,
-      'otp': otp,
+    final payload = await _client.post('/auth/email-login', {
+      'email': email,
+      'password': password,
     }) as Map<String, dynamic>;
 
     final token = payload['token'] as String? ?? '';
@@ -39,35 +33,10 @@ class AuthApi {
     return VerifiedSession(
       token: token,
       userId: userId,
-      fullName: user['fullName'] as String? ?? 'Driver User',
+      fullName: user['fullName'] as String? ?? 'Driver',
       role: AppRole.driver,
     );
   }
-
-  Future<void> sendForgotPassword({
-    required String email,
-    String? redirectTo,
-  }) async {
-    await _client.post('/auth/forgot-password', {
-      'email': email,
-      if (redirectTo != null && redirectTo.trim().isNotEmpty)
-        'redirectTo': redirectTo.trim(),
-    });
-  }
-
-  Future<void> sendVerificationEmail({
-    required String email,
-    required String fullName,
-    String? redirectTo,
-  }) async {
-    await _client.post('/auth/email/send-verification', {
-      'email': email,
-      'fullName': fullName,
-      if (redirectTo != null && redirectTo.trim().isNotEmpty)
-        'redirectTo': redirectTo.trim(),
-    });
-  }
-
 }
 
 class VerifiedSession {

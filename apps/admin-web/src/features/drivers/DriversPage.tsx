@@ -21,18 +21,22 @@ export function DriversPage() {
         user_id: "",
         full_name: "",
         phone_number: "",
+        email: "",
         license_number: "",
         assigned_bus_id: "",
         status: "active",
+        is_active: "true",
         school_id: ""
       }}
       fields={[
         { key: "user_id", label: "User ID", placeholder: "Linked user id", required: true },
         { key: "full_name", label: "Full Name", placeholder: "Driver name", required: true },
         { key: "phone_number", label: "Phone", placeholder: "Phone number" },
+        { key: "email", label: "Email", placeholder: "driver@school.com" },
         { key: "license_number", label: "License", placeholder: "License number" },
         { key: "assigned_bus_id", label: "Assigned Bus", placeholder: "Bus ID" },
         { key: "status", label: "Status", placeholder: "active" },
+        { key: "is_active", label: "Is Active", placeholder: "true" },
         { key: "school_id", label: "School", placeholder: "School ID (super admin only)" }
       ]}
     />

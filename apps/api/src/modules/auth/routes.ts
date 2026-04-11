@@ -105,7 +105,7 @@ authRouter.post("/forgot-password", asyncHandler(async (request, response) => {
 
   await sendBrevoEmail({
     to: [{ email: body.email, name: fullName }],
-    subject: "Reset your SchoolBus Bridge password",
+    subject: "Reset your SURAKSHA password",
     htmlContent: buildForgotPasswordEmailHtml({
       fullName,
       resetLink: generated.properties.action_link
@@ -202,7 +202,7 @@ authRouter.post("/forgot-password/parent-otp/send", asyncHandler(async (request,
   } else {
     await sendBrevoEmail({
       to: [{ email, name: fullName }],
-      subject: "SchoolBus Bridge password reset OTP",
+      subject: "SURAKSHA password reset OTP",
       htmlContent: buildForgotPasswordOtpEmailHtml({
         fullName,
         otp,
@@ -330,7 +330,7 @@ authRouter.post("/email/send-verification", asyncHandler(async (request, respons
 
   await sendBrevoEmail({
     to: [{ email: normalizedEmail, name: body.fullName }],
-    subject: "Verify your SchoolBus Bridge email",
+    subject: "Verify your SURAKSHA email",
     htmlContent: buildVerificationEmailHtml({
       fullName: body.fullName,
       verificationLink: generated.properties.action_link
@@ -339,7 +339,7 @@ authRouter.post("/email/send-verification", asyncHandler(async (request, respons
 
   await sendBrevoEmail({
     to: [{ email: normalizedEmail, name: body.fullName }],
-    subject: "Welcome to SchoolBus Bridge",
+    subject: "Welcome to SURAKSHA",
     htmlContent: buildWelcomeEmailHtml({
       fullName: body.fullName
     })

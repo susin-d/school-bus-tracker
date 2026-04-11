@@ -13,7 +13,7 @@ export default function Footer() {
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
                 <span className="text-sm font-bold text-primary-foreground">SB</span>
               </div>
-              <span className="font-bold text-foreground">SchoolBus Bridge</span>
+              <span className="font-bold text-foreground">SURAKSHA</span>
             </div>
             <p className="text-sm text-foreground/60">
               Smart school transport management for the modern era.
@@ -78,7 +78,7 @@ export default function Footer() {
         {/* Bottom */}
         <div className="flex flex-col sm:flex-row justify-between items-center gap-8 pt-8">
           <p className="text-sm text-foreground/60">
-            © 2024 SchoolBus Bridge. All rights reserved.
+            © 2024 SURAKSHA. All rights reserved.
           </p>
 
           {/* Social Icons */}

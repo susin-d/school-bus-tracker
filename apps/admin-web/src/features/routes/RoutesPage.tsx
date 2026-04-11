@@ -23,6 +23,7 @@ export function RoutesPage() {
         direction: "pickup",
         description: "",
         status: "active",
+        is_active: "true",
         school_id: ""
       }}
       fields={[
@@ -31,6 +32,7 @@ export function RoutesPage() {
         { key: "direction", label: "Direction", placeholder: "pickup or drop" },
         { key: "description", label: "Description", placeholder: "Route description" },
         { key: "status", label: "Status", placeholder: "active" },
+        { key: "is_active", label: "Is Active", placeholder: "true" },
         { key: "school_id", label: "School", placeholder: "School ID (super admin only)" }
       ]}
     />

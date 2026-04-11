@@ -94,7 +94,7 @@ export function AppShell({
       <aside className={sidebarOpen ? "app-sidebar open" : "app-sidebar"} aria-label="Admin navigation">
         <div className="app-sidebar-brand">
           <div>
-            <p className="eyebrow">SchoolBus Bridge</p>
+            <p className="eyebrow">SURAKSHA</p>
             <h2 className="app-sidebar-title">Admin Console</h2>
           </div>
         </div>

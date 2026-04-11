@@ -7,6 +7,9 @@ ThemeData buildSchoolBusLightTheme() {
     seedColor: AppColors.seed,
     brightness: Brightness.light,
   ).copyWith(
+    primary: AppColors.orange,
+    secondary: const Color(0xFFFFA040),
+    tertiary: AppColors.orangeStrong,
     error: const Color(0xFFFF6B6B),
   );
   return ThemeData(
@@ -88,6 +91,9 @@ ThemeData buildSchoolBusDarkTheme() {
     seedColor: AppColors.seed,
     brightness: Brightness.dark,
   ).copyWith(
+    primary: const Color(0xFFFFB366),
+    secondary: const Color(0xFFFF9E57),
+    tertiary: AppColors.orange,
     error: const Color(0xFFFF6B6B),
   );
   return ThemeData(

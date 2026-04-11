@@ -15,14 +15,14 @@ function requireArg(name: string, value: string) {
 
 async function main() {
   const to = requireArg("recipient email", getArg(0));
-  const subject = getArg(1) || "SchoolBus Bridge test email";
+  const subject = getArg(1) || "SURAKSHA test email";
 
   await sendBrevoEmail({
     to: [{ email: to }],
     subject,
     htmlContent: `
       <div style="font-family:Arial,sans-serif;line-height:1.5">
-        <h2 style="margin:0 0 12px">SchoolBus Bridge test email</h2>
+        <h2 style="margin:0 0 12px">SURAKSHA test email</h2>
         <p style="margin:0 0 12px">This is a simple delivery test from the API.</p>
         <p style="margin:0">If you received this, Brevo sending is working.</p>
       </div>

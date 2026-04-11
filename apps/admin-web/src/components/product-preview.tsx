@@ -38,7 +38,7 @@ export default function ProductPreview() {
                 See the platform in action
               </h2>
               <p className="text-lg text-foreground/60">
-                SchoolBus Bridge provides a unified interface for managing every aspect of your transportation operations. From dispatch to delivery, everything is one click away.
+                SURAKSHA provides a unified interface for managing every aspect of your transportation operations. From dispatch to delivery, everything is one click away.
               </p>
             </div>
 

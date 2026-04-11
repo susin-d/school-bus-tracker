@@ -1,21 +1,21 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  static const seed = Color(0xFFF07A1F);
-  static const orange = Color(0xFFF07A1F);
-  static const orangeStrong = Color(0xFF8B4B1F);
+  static const seed = Color(0xFFF57C00);
+  static const orange = Color(0xFFF57C00);
+  static const orangeStrong = Color(0xFFE65100);
   static const brown = Color(0xFF3F2413);
 }
 
 class AppLightColors {
-  static const scaffoldBackground = Color(0xFFFFF8F2);
-  static const textPrimary = Color(0xFF3F2413);
-  static const textSecondary = Color(0xFF7F5E44);
+  static const scaffoldBackground = Color(0xFFFFFFFF);
+  static const textPrimary = Color(0xFF1F2937);
+  static const textSecondary = Color(0xFF6B7280);
   static const panelBackground = Color(0xFFFFFFFF);
-  static const panelBorder = Color(0x33834A1C);
-  static const accentSoft = Color(0xFFFFE2C4);
-  static const ink = Color(0xFF3F2413);
-  static const warm = Color(0xFFFFF2E2);
+  static const panelBorder = Color(0x33F57C00);
+  static const accentSoft = Color(0xFFFFF3E0);
+  static const ink = Color(0xFFE65100);
+  static const warm = Color(0xFFFFFFFF);
 }
 
 class AppDarkColors {

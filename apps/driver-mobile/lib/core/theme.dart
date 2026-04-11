@@ -3,12 +3,20 @@ import 'package:flutter/material.dart';
 import 'colors.dart';
 
 ThemeData buildSchoolBusLightTheme() {
-  return ThemeData(
+  final colorScheme = ColorScheme.fromSeed(
+    seedColor: AppColors.seed,
     brightness: Brightness.light,
-    colorScheme: ColorScheme.fromSeed(
-      seedColor: AppColors.seed,
-      brightness: Brightness.light,
-    ),
+  ).copyWith(
+    primary: AppColors.orange,
+    secondary: const Color(0xFFFFA040),
+    tertiary: AppColors.orangeStrong,
+    error: const Color(0xFFFF6B6B),
+  );
+
+  return ThemeData(
+    useMaterial3: true,
+    brightness: Brightness.light,
+    colorScheme: colorScheme,
     scaffoldBackgroundColor: AppLightColors.scaffoldBackground,
     appBarTheme: const AppBarTheme(
       backgroundColor: Colors.transparent,
@@ -34,12 +42,20 @@ ThemeData buildSchoolBusLightTheme() {
 }
 
 ThemeData buildSchoolBusDarkTheme() {
-  return ThemeData(
+  final colorScheme = ColorScheme.fromSeed(
+    seedColor: AppColors.seed,
     brightness: Brightness.dark,
-    colorScheme: ColorScheme.fromSeed(
-      seedColor: AppColors.seed,
-      brightness: Brightness.dark,
-    ),
+  ).copyWith(
+    primary: const Color(0xFFFFB366),
+    secondary: const Color(0xFFFF9E57),
+    tertiary: AppColors.orange,
+    error: const Color(0xFFFF6B6B),
+  );
+
+  return ThemeData(
+    useMaterial3: true,
+    brightness: Brightness.dark,
+    colorScheme: colorScheme,
     scaffoldBackgroundColor: AppDarkColors.scaffoldBackground,
     appBarTheme: const AppBarTheme(
       backgroundColor: Colors.transparent,

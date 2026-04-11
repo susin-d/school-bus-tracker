@@ -22,6 +22,7 @@ export function AssignmentsPage() {
         route_id: "",
         stop_id: "",
         bus_id: "",
+        status: "active",
         school_id: ""
       }}
       fields={[
@@ -29,6 +30,7 @@ export function AssignmentsPage() {
         { key: "route_id", label: "Route", placeholder: "Route ID" },
         { key: "stop_id", label: "Stop", placeholder: "Stop ID" },
         { key: "bus_id", label: "Bus", placeholder: "Bus ID" },
+        { key: "status", label: "Status", placeholder: "active" },
         { key: "school_id", label: "School", placeholder: "School ID (super admin only)" }
       ]}
     />

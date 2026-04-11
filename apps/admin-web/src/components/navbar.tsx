@@ -15,7 +15,7 @@ export default function Navbar() {
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
             <span className="text-sm font-bold text-primary-foreground">SB</span>
           </div>
-          <span className="text-lg font-bold text-foreground">SchoolBus Bridge</span>
+          <span className="text-lg font-bold text-foreground">SURAKSHA</span>
         </div>
 
         {/* Desktop Menu */}

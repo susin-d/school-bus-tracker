@@ -1,12 +1,14 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 class ApiClient {
   ApiClient({
     required this.userId,
     this.accessToken,
     String? baseUrl,
-  }) : _baseUrl = (baseUrl ?? const String.fromEnvironment('API_BASE_URL', defaultValue: 'http://localhost:4000')).replaceAll(RegExp(r'/$'), '');
+  }) : _baseUrl = (baseUrl ?? dotenv.env['API_BASE_URL'] ?? 'http://10.0.2.2:4000').replaceAll(RegExp(r'/$'), '');
 
   final String userId;
   final String? accessToken;

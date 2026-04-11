@@ -67,7 +67,7 @@ export async function sendBrevoEmail(input: {
     body: JSON.stringify({
       sender: {
         email: readEnv("BREVO_SENDER_EMAIL"),
-        name: process.env.BREVO_SENDER_NAME ?? "SchoolBus Bridge"
+        name: process.env.BREVO_SENDER_NAME ?? "SURAKSHA"
       },
       to: input.to,
       subject: input.subject,

@@ -131,7 +131,7 @@ export function listLeaveRequests(currentUser: AdminRequestUser) {
 
 export function createSchool(
   currentUser: AdminRequestUser,
-  payload: { name: string; address?: string }
+  payload: Record<string, unknown>
 ) {
   return requestJson<Record<string, unknown>>(
     "POST",
@@ -149,7 +149,7 @@ export function deleteSchool(currentUser: AdminRequestUser, schoolId: string) {
 export function updateSchool(
   currentUser: AdminRequestUser,
   schoolId: string,
-  payload: { name: string; address?: string }
+  payload: Record<string, unknown>
 ) {
   return requestJson<Record<string, unknown>>(
     "PUT",
@@ -162,13 +162,7 @@ export function updateSchool(
 
 export function createUser(
   currentUser: AdminRequestUser,
-  payload: {
-    full_name: string;
-    role: string;
-    school_id?: string;
-    status?: string;
-    is_active?: boolean;
-  }
+  payload: Record<string, unknown>
 ) {
   return requestJson<Record<string, unknown>>(
     "POST",
@@ -195,13 +189,7 @@ export function deleteUser(currentUser: AdminRequestUser, userId: string) {
 export function updateUser(
   currentUser: AdminRequestUser,
   userId: string,
-  payload: {
-    full_name?: string;
-    role?: string;
-    school_id?: string;
-    status?: string;
-    is_active?: boolean;
-  }
+  payload: Record<string, unknown>
 ) {
   return requestJson<Record<string, unknown>>(
     "PUT",
@@ -216,13 +204,7 @@ export function updateUser(
 
 export function createStudent(
   currentUser: AdminRequestUser,
-  payload: {
-    full_name: string;
-    grade: string;
-    address_text?: string;
-    home_address?: string;
-    school_id?: string;
-  }
+  payload: Record<string, unknown>
 ) {
   return requestJson<Record<string, unknown>>(
     "POST",
@@ -249,13 +231,7 @@ export function deleteStudent(currentUser: AdminRequestUser, studentId: string) 
 export function updateStudent(
   currentUser: AdminRequestUser,
   studentId: string,
-  payload: {
-    full_name?: string;
-    grade?: string;
-    address_text?: string;
-    home_address?: string;
-    school_id?: string;
-  }
+  payload: Record<string, unknown>
 ) {
   return requestJson<Record<string, unknown>>(
     "PUT",

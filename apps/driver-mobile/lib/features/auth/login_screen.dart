@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../core/api_access.dart';
+import '../../core/app_state.dart';
 import '../../core/app_scope.dart';
+import '../../core/colors.dart';
 import 'auth_api.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -11,251 +12,286 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
-  final _phoneController = TextEditingController();
-  final _otpController = TextEditingController();
+class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
   final _emailController = TextEditingController();
-  final _redirectController = TextEditingController(
-    text: const String.fromEnvironment('AUTH_REDIRECT_URL', defaultValue: ''),
-  );
-
+  final _passwordController = TextEditingController();
   final _authApi = AuthApi();
 
   bool _busy = false;
-  String _feedback = '';
+  bool _obscurePassword = true;
+  String? _errorMessage;
+
+  late final AnimationController _fadeController;
+  late final Animation<double> _fadeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _fadeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _fadeAnimation = CurvedAnimation(parent: _fadeController, curve: Curves.easeOut);
+    _fadeController.forward();
+  }
 
   @override
   void dispose() {
-    _phoneController.dispose();
-    _otpController.dispose();
     _emailController.dispose();
-    _redirectController.dispose();
+    _passwordController.dispose();
+    _fadeController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final screenHeight = MediaQuery.of(context).size.height;
 
     return Scaffold(
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-          children: [
-            Text(
-              'SchoolBus Driver',
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: theme.colorScheme.primary,
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 28),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: screenHeight - MediaQuery.of(context).padding.vertical),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(height: screenHeight * 0.08),
+
+                  // Logo / Brand
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [AppColors.orange, AppColors.orangeStrong],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.orange.withAlpha(80),
+                          blurRadius: 24,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.directions_bus_rounded,
+                      color: Colors.white,
+                      size: 42,
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+
+                  Text(
+                    'SchoolBus',
+                    style: theme.textTheme.headlineLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 34,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Driver',
+                    style: theme.textTheme.headlineLarge?.copyWith(
+                      color: AppColors.orange,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 34,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Sign in to start your trip',
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: isDark ? AppDarkColors.textSecondary : AppLightColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+
+                  // Email field
+                  Text(
+                    'Email',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: isDark ? AppDarkColors.textPrimary : AppLightColors.textPrimary,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    textInputAction: TextInputAction.next,
+                    enabled: !_busy,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: isDark ? AppDarkColors.textPrimary : AppLightColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'driver@school.com',
+                      prefixIcon: const Icon(Icons.email_outlined),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide(
+                          color: isDark ? AppDarkColors.panelBorder : AppLightColors.panelBorder,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide(color: AppColors.orange, width: 2),
+                      ),
+                      filled: true,
+                      fillColor: isDark ? AppDarkColors.panelBackground : AppLightColors.panelBackground,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Password field
+                  Text(
+                    'Password',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: isDark ? AppDarkColors.textPrimary : AppLightColors.textPrimary,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _passwordController,
+                    obscureText: _obscurePassword,
+                    textInputAction: TextInputAction.done,
+                    enabled: !_busy,
+                    onSubmitted: (_) => _handleLogin(),
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: isDark ? AppDarkColors.textPrimary : AppLightColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: '••••••••',
+                      prefixIcon: const Icon(Icons.lock_outline_rounded),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscurePassword ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                          color: isDark ? AppDarkColors.textSecondary : AppLightColors.textSecondary,
+                        ),
+                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                      ),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide(
+                          color: isDark ? AppDarkColors.panelBorder : AppLightColors.panelBorder,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide(color: AppColors.orange, width: 2),
+                      ),
+                      filled: true,
+                      fillColor: isDark ? AppDarkColors.panelBackground : AppLightColors.panelBackground,
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+
+                  // Sign in button
+                  SizedBox(
+                    height: 54,
+                    child: FilledButton(
+                      onPressed: _busy ? null : _handleLogin,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.orange,
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: AppColors.orange.withAlpha(120),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                      ),
+                      child: _busy
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text('Sign In'),
+                    ),
+                  ),
+
+                  if (_errorMessage != null) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.error.withAlpha(20),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: theme.colorScheme.error.withAlpha(60)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.error_outline_rounded, color: theme.colorScheme.error, size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              _errorMessage!,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.error,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 40),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
-            Text('Login', style: theme.textTheme.headlineLarge),
-            const SizedBox(height: 12),
-            Text(
-              'Dedicated driver app for trip control, attendance, and safety workflows.',
-              style: theme.textTheme.bodyLarge,
-            ),
-            const SizedBox(height: 24),
-            _buildOtpCard(theme),
-            const SizedBox(height: 16),
-            _buildEmailCard(theme),
-            if (_feedback.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              Text(
-                _feedback,
-                style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface),
-              ),
-            ],
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildOtpCard(ThemeData theme) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Phone OTP', style: theme.textTheme.titleLarge?.copyWith(fontSize: 18)),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _phoneController,
-              decoration: const InputDecoration(
-                hintText: '+919999999999',
-                labelText: 'Phone Number',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _otpController,
-              decoration: const InputDecoration(
-                hintText: '123456',
-                labelText: 'OTP',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                FilledButton.tonal(
-                  onPressed: _busy ? null : _handleSendOtp,
-                  child: const Text('Send OTP'),
-                ),
-                FilledButton(
-                  onPressed: _busy ? null : _handleVerifyOtp,
-                  child: const Text('Verify OTP & Sign In'),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  Future<void> _handleLogin() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
 
-  Widget _buildEmailCard(ThemeData theme) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Email Actions', style: theme.textTheme.titleLarge?.copyWith(fontSize: 18)),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _emailController,
-              decoration: const InputDecoration(
-                hintText: 'name@school.com',
-                labelText: 'Email',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _redirectController,
-              decoration: const InputDecoration(
-                hintText: 'https://app.example.com/auth/callback',
-                labelText: 'Redirect URL (optional)',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                FilledButton.tonal(
-                  onPressed: _busy ? null : _handleForgotPassword,
-                  child: const Text('Send Reset Email'),
-                ),
-                FilledButton.tonal(
-                  onPressed: _busy ? null : _handleSendVerification,
-                  child: const Text('Send Verification Email'),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _handleSendOtp() async {
-    final phone = _phoneController.text.trim();
-    if (phone.isEmpty) {
-      _setFeedback('Phone number is required.');
+    if (email.isEmpty) {
+      setState(() => _errorMessage = 'Please enter your email.');
       return;
     }
-    await _runAsync(() async {
-      await _authApi.sendOtp(phone);
-      _setFeedback('OTP sent successfully.');
+    if (password.isEmpty) {
+      setState(() => _errorMessage = 'Please enter your password.');
+      return;
+    }
+
+    setState(() {
+      _busy = true;
+      _errorMessage = null;
     });
-  }
 
-  Future<void> _handleVerifyOtp() async {
-    final phone = _phoneController.text.trim();
-    final otp = _otpController.text.trim();
-    if (phone.isEmpty || otp.isEmpty) {
-      _setFeedback('Phone number and OTP are required.');
-      return;
-    }
-    await _runAsync(() async {
-      final session = await _authApi.verifyOtp(phone: phone, otp: otp);
-      if (!mounted) {
-        return;
-      }
+    try {
+      final session = await _authApi.login(email: email, password: password);
+      if (!mounted) return;
       AppScope.of(context).signIn(
         userId: session.userId,
         fullName: session.fullName,
         role: AppRole.driver,
         accessToken: session.token,
       );
-    });
-  }
-
-  Future<void> _handleForgotPassword() async {
-    final email = _emailController.text.trim();
-    if (email.isEmpty) {
-      _setFeedback('Email is required for password reset.');
-      return;
-    }
-    await _runAsync(() async {
-      await _authApi.sendForgotPassword(
-        email: email,
-        redirectTo: _redirectController.text.trim(),
-      );
-      _setFeedback('Password reset email sent.');
-    });
-  }
-
-  Future<void> _handleSendVerification() async {
-    final email = _emailController.text.trim();
-    final fullName = _nameController.text.trim().isEmpty ? 'SchoolBus User' : _nameController.text.trim();
-    if (email.isEmpty) {
-      _setFeedback('Email is required for verification.');
-      return;
-    }
-    await _runAsync(() async {
-      await _authApi.sendVerificationEmail(
-        email: email,
-        fullName: fullName,
-        redirectTo: _redirectController.text.trim(),
-      );
-      _setFeedback('Verification and welcome emails sent.');
-    });
-  }
-
-  Future<void> _runAsync(Future<void> Function() action) async {
-    setState(() {
-      _busy = true;
-      _feedback = '';
-    });
-    try {
-      await action();
-    } catch (error) {
-      _setFeedback(_readableError(error));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _errorMessage = _readableError(e));
     } finally {
-      if (mounted) {
-        setState(() {
-          _busy = false;
-        });
-      }
+      if (mounted) setState(() => _busy = false);
     }
-  }
-
-  void _setFeedback(String message) {
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _feedback = message;
-    });
   }
 
   String _readableError(Object error) {
@@ -266,6 +302,6 @@ class _LoginScreenState extends State<LoginScreen> {
     if (raw.startsWith('FormatException: ')) {
       return raw.replaceFirst('FormatException: ', '');
     }
-    return raw;
+    return 'Invalid email or password. Please try again.';
   }
 }

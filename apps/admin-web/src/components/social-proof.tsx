@@ -16,7 +16,7 @@ const testimonials = [
     name: 'Sarah Mitchell',
     role: 'Transportation Coordinator',
     company: 'Lincoln Public Schools',
-    quote: 'SchoolBus Bridge cut our coordination calls by 80%. We now have complete visibility into every trip.',
+    quote: 'SURAKSHA cut our coordination calls by 80%. We now have complete visibility into every trip.',
     avatar: 'SM',
   },
   {

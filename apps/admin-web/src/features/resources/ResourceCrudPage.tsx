@@ -42,6 +42,7 @@ export function ResourceCrudPage({
   const currentUser = useRequiredAdminUser();
   const [reloadKey, setReloadKey] = useState(0);
   const [feedback, setFeedback] = useState("");
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [createForm, setCreateForm] = useState<Record<string, string>>(createTemplate);
   const [editForm, setEditForm] = useState<Record<string, string>>(createTemplate);
@@ -113,10 +114,22 @@ export function ResourceCrudPage({
   }
 
   function normalizePayload(form: Record<string, string>) {
-    const payload: Record<string, string> = {};
+    const payload: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(form)) {
       const trimmed = value.trim();
       if (trimmed) {
+        if (key === "is_active") {
+          const normalized = trimmed.toLowerCase();
+          if (["true", "1", "yes", "active"].includes(normalized)) {
+            payload[key] = true;
+            continue;
+          }
+          if (["false", "0", "no", "inactive"].includes(normalized)) {
+            payload[key] = false;
+            continue;
+          }
+        }
+
         payload[key] = trimmed;
       }
     }
@@ -126,6 +139,7 @@ export function ResourceCrudPage({
   function resetCreateForm() {
     setCreateForm(createTemplate);
     setCreateFieldErrors({});
+    setIsCreateOpen(false);
   }
 
   function resetEditForm() {
@@ -134,10 +148,11 @@ export function ResourceCrudPage({
     setEditFieldErrors({});
   }
 
-  function validateRequired(payload: Record<string, string>) {
+  function validateRequired(payload: Record<string, unknown>) {
     const nextErrors: Record<string, string> = {};
     for (const field of fields) {
-      if (field.required && !payload[field.key]) {
+      const value = payload[field.key];
+      if (field.required && (value == null || value === "")) {
         nextErrors[field.key] = `${field.label} is required.`;
       }
     }
@@ -146,19 +161,25 @@ export function ResourceCrudPage({
   }
 
   useEffect(() => {
-    if (!editId) {
+    if (!editId && !isCreateOpen) {
       return;
     }
 
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        resetEditForm();
+        if (editId) {
+          resetEditForm();
+        }
+        if (isCreateOpen) {
+          setIsCreateOpen(false);
+          setCreateFieldErrors({});
+        }
       }
     };
 
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [editId]);
+  }, [editId, isCreateOpen]);
 
   async function handleCreate() {
     const payload = normalizePayload(createForm);
@@ -227,26 +248,17 @@ export function ResourceCrudPage({
             <p className="eyebrow">Create record</p>
             <h2>{resourceLabel}</h2>
           </div>
-        </header>
-
-        <div className="resource-form">
-          {fields.map((field) => (
-            <input
-              key={field.key}
-              className={createFieldErrors[field.key] ? "resource-input resource-input-error" : "resource-input"}
-              onChange={(event) => setCreateField(field.key, event.target.value)}
-              placeholder={`${field.label}${field.required ? " *" : ""}`}
-              value={createForm[field.key] ?? ""}
-            />
-          ))}
-          <button className="resource-action" onClick={handleCreate} type="button">
+          <button
+            className="resource-action"
+            onClick={() => {
+              setIsCreateOpen(true);
+              setFeedback(`Creating a new ${resourceLabel.toLowerCase()} record.`);
+            }}
+            type="button"
+          >
             Create {resourceLabel}
           </button>
-        </div>
-
-        {Object.values(createFieldErrors).filter(Boolean).length > 0 && (
-          <p className="field-error">Fix required fields before saving.</p>
-        )}
+        </header>
         {feedback && <p className="panel-summary" role="status">{feedback}</p>}
 
         <section className="resource-list">
@@ -364,13 +376,25 @@ export function ResourceCrudPage({
             </header>
             <div className="resource-form">
               {fields.map((field) => (
-                <input
-                  key={field.key}
-                  className={editFieldErrors[field.key] ? "resource-input resource-input-error" : "resource-input"}
-                  onChange={(event) => setEditField(field.key, event.target.value)}
-                  placeholder={`${field.label}${field.required ? " *" : ""}`}
-                  value={editForm[field.key] ?? ""}
-                />
+                field.key === "is_active" ? (
+                  <select
+                    key={field.key}
+                    className={editFieldErrors[field.key] ? "resource-input resource-input-error" : "resource-input"}
+                    onChange={(event) => setEditField(field.key, event.target.value)}
+                    value={editForm[field.key] ?? "true"}
+                  >
+                    <option value="true">Active</option>
+                    <option value="false">Inactive</option>
+                  </select>
+                ) : (
+                  <input
+                    key={field.key}
+                    className={editFieldErrors[field.key] ? "resource-input resource-input-error" : "resource-input"}
+                    onChange={(event) => setEditField(field.key, event.target.value)}
+                    placeholder={`${field.label}${field.required ? " *" : ""}`}
+                    value={editForm[field.key] ?? ""}
+                  />
+                )
               ))}
             </div>
             {Object.values(editFieldErrors).filter(Boolean).length > 0 && (
@@ -381,6 +405,73 @@ export function ResourceCrudPage({
                 Save {resourceLabel}
               </button>
               <button className="resource-action subtle" onClick={resetEditForm} type="button">
+                Cancel
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {isCreateOpen && (
+        <div
+          className="edit-overlay-backdrop"
+          onClick={() => {
+            setIsCreateOpen(false);
+            setCreateFieldErrors({});
+          }}
+          aria-hidden="true"
+        >
+          <section
+            className="resource-panel edit-overlay-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Create ${resourceLabel}`}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="resource-header">
+              <div>
+                <p className="eyebrow">Create record</p>
+                <h2>{resourceLabel}</h2>
+              </div>
+            </header>
+            <div className="resource-form">
+              {fields.map((field) => (
+                field.key === "is_active" ? (
+                  <select
+                    key={field.key}
+                    className={createFieldErrors[field.key] ? "resource-input resource-input-error" : "resource-input"}
+                    onChange={(event) => setCreateField(field.key, event.target.value)}
+                    value={createForm[field.key] ?? "true"}
+                  >
+                    <option value="true">Active</option>
+                    <option value="false">Inactive</option>
+                  </select>
+                ) : (
+                  <input
+                    key={field.key}
+                    className={createFieldErrors[field.key] ? "resource-input resource-input-error" : "resource-input"}
+                    onChange={(event) => setCreateField(field.key, event.target.value)}
+                    placeholder={`${field.label}${field.required ? " *" : ""}`}
+                    value={createForm[field.key] ?? ""}
+                  />
+                )
+              ))}
+            </div>
+            {Object.values(createFieldErrors).filter(Boolean).length > 0 && (
+              <p className="field-error">Fix required fields before saving.</p>
+            )}
+            <div className="resource-actions-row edit-overlay-actions">
+              <button className="resource-action" onClick={handleCreate} type="button">
+                Save {resourceLabel}
+              </button>
+              <button
+                className="resource-action subtle"
+                onClick={() => {
+                  setIsCreateOpen(false);
+                  setCreateFieldErrors({});
+                }}
+                type="button"
+              >
                 Cancel
               </button>
             </div>
