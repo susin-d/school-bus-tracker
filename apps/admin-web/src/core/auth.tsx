@@ -1,6 +1,7 @@
 import {
   createContext,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type PropsWithChildren
@@ -17,14 +18,69 @@ type AdminSessionContextValue = {
   authError: string | null;
   clearAuthError: () => void;
   isLoading: boolean;
+  isBootstrapping: boolean;
 };
 
 const AdminSessionContext = createContext<AdminSessionContextValue | null>(null);
+const adminSessionTokenStorageKey = "school-bus-admin-access-token";
 
 export function AdminSessionProvider({ children }: PropsWithChildren) {
   const [sessionUser, setSessionUser] = useState<AdminRequestUser | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isBootstrapping, setIsBootstrapping] = useState(true);
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function restoreSessionFromStorage() {
+      try {
+        const accessToken = window.localStorage.getItem(adminSessionTokenStorageKey);
+        if (!accessToken) {
+          return;
+        }
+
+        const meResponse = await fetch(`${getApiBaseUrl()}/auth/me`, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`
+          }
+        });
+
+        if (!meResponse.ok) {
+          window.localStorage.removeItem(adminSessionTokenStorageKey);
+          return;
+        }
+
+        const mePayload = (await meResponse.json()) as { user?: UserProfile };
+        const user = mePayload.user;
+
+        if (!user || (user.role !== "admin" && user.role !== "super_admin")) {
+          window.localStorage.removeItem(adminSessionTokenStorageKey);
+          return;
+        }
+
+        if (!isCancelled) {
+          setSessionUser({
+            id: user.id,
+            label: user.fullName,
+            role: user.role,
+            schoolId: user.schoolId,
+            accessToken
+          });
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsBootstrapping(false);
+        }
+      }
+    }
+
+    void restoreSessionFromStorage();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
 
   const value = useMemo<AdminSessionContextValue>(() => {
     async function signInWithEmailPassword(email: string, password: string) {
@@ -84,6 +140,8 @@ export function AdminSessionProvider({ children }: PropsWithChildren) {
           throw new Error("This account is not allowed in admin web");
         }
 
+        window.localStorage.setItem(adminSessionTokenStorageKey, accessToken);
+
         setSessionUser({
           id: user.id,
           label: user.fullName,
@@ -92,6 +150,7 @@ export function AdminSessionProvider({ children }: PropsWithChildren) {
           accessToken
         });
       } catch (error) {
+        window.localStorage.removeItem(adminSessionTokenStorageKey);
         setSessionUser(null);
         setAuthError(error instanceof Error ? error.message : "Sign-in failed");
       } finally {
@@ -110,6 +169,7 @@ export function AdminSessionProvider({ children }: PropsWithChildren) {
           });
         }
       } finally {
+        window.localStorage.removeItem(adminSessionTokenStorageKey);
         setSessionUser(null);
       }
     }
@@ -120,9 +180,10 @@ export function AdminSessionProvider({ children }: PropsWithChildren) {
       signOutSession,
       authError,
       clearAuthError: () => setAuthError(null),
-      isLoading
+      isLoading,
+      isBootstrapping
     };
-  }, [authError, isLoading, sessionUser]);
+  }, [authError, isBootstrapping, isLoading, sessionUser]);
 
   return (
     <AdminSessionContext.Provider value={value}>

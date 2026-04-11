@@ -1,19 +1,45 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { AppShell } from "../../app/AppShell";
 import { listLeaveRequests, updateLeaveRequestStatus } from "../../core/api";
 import { useRequiredAdminUser } from "../../core/auth";
 import { useResource } from "../../core/useResource";
-import { LeaveRequestsOverview } from "./LeaveRequestsOverview";
 
 export function LeaveRequestsPage() {
   const currentUser = useRequiredAdminUser();
   const [feedback, setFeedback] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
+  const [sortBy, setSortBy] = useState<"date" | "status" | "tripKind">("date");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const { data, isLoading, error } = useResource(
     () => listLeaveRequests(currentUser),
     [currentUser.id, reloadKey]
   );
+
+  const filteredRequests = useMemo(
+    () =>
+      (data?.requests ?? []).filter((requestItem) =>
+        statusFilter === "all" ? true : requestItem.status === statusFilter
+      ),
+    [data?.requests, statusFilter]
+  );
+
+  const sortedRequests = useMemo(() => {
+    const items = [...filteredRequests];
+    items.sort((left, right) => {
+      const leftValue =
+        sortBy === "status" ? left.status : sortBy === "tripKind" ? left.tripKind : left.leaveDate;
+      const rightValue =
+        sortBy === "status" ? right.status : sortBy === "tripKind" ? right.tripKind : right.leaveDate;
+      const comparison = String(leftValue).localeCompare(String(rightValue), undefined, {
+        numeric: true,
+        sensitivity: "base"
+      });
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+    return items;
+  }, [filteredRequests, sortBy, sortDirection]);
 
   async function handleStatusChange(leaveRequestId: string, status: "approved" | "rejected") {
     try {
@@ -35,21 +61,35 @@ export function LeaveRequestsPage() {
       }
       activeRoute="leaveRequests"
     >
-      <section className="panel-grid compact" style={{ marginTop: 20 }}>
-        <LeaveRequestsOverview view={currentUser.role === "super_admin" ? "super_admin" : "school_admin"} />
-      </section>
       <section className="resource-panel">
         <header className="resource-header">
           <div>
             <p className="eyebrow">Live Data</p>
             <h2>Leave Requests</h2>
           </div>
+          <div className="resource-actions-row">
+            <select className="resource-input" onChange={(event) => setStatusFilter(event.target.value as "all" | "pending" | "approved" | "rejected")} value={statusFilter}>
+              <option value="all">All statuses</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+            <select className="resource-input" onChange={(event) => setSortBy(event.target.value as "date" | "status" | "tripKind")} value={sortBy}>
+              <option value="date">Sort: Leave Date</option>
+              <option value="status">Sort: Status</option>
+              <option value="tripKind">Sort: Trip Kind</option>
+            </select>
+            <select className="resource-input" onChange={(event) => setSortDirection(event.target.value as "asc" | "desc")} value={sortDirection}>
+              <option value="desc">Descending</option>
+              <option value="asc">Ascending</option>
+            </select>
+          </div>
         </header>
 
         {isLoading && <p className="panel-summary">Loading leave requests from the backend.</p>}
         {error && <p className="panel-summary error-copy">{error}</p>}
         {feedback && <p className="panel-summary">{feedback}</p>}
-        {data && (
+        {data && sortedRequests.length > 0 && (
           <div className="table-shell">
             <table className="resource-table">
               <thead>
@@ -63,7 +103,7 @@ export function LeaveRequestsPage() {
                 </tr>
               </thead>
               <tbody>
-                {data.requests.map((requestItem) => (
+                {sortedRequests.map((requestItem) => (
                   <tr key={requestItem.id}>
                     <td>{requestItem.id}</td>
                     <td>{requestItem.studentId}</td>
@@ -94,6 +134,12 @@ export function LeaveRequestsPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+        {data && sortedRequests.length === 0 && (
+          <div className="empty-state">
+            <strong>No leave requests match the current filters.</strong>
+            <span>Try a different status filter.</span>
           </div>
         )}
       </section>

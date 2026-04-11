@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { AppShell } from "../../app/AppShell";
 import { useRequiredAdminUser } from "../../core/auth";
@@ -43,14 +43,23 @@ export function ResourceCrudPage({
   const [reloadKey, setReloadKey] = useState(0);
   const [feedback, setFeedback] = useState("");
   const [editId, setEditId] = useState<string | null>(null);
-  const [form, setForm] = useState<Record<string, string>>(createTemplate);
+  const [createForm, setCreateForm] = useState<Record<string, string>>(createTemplate);
+  const [editForm, setEditForm] = useState<Record<string, string>>(createTemplate);
   const [searchQuery, setSearchQuery] = useState("");
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [createFieldErrors, setCreateFieldErrors] = useState<Record<string, string>>({});
+  const [editFieldErrors, setEditFieldErrors] = useState<Record<string, string>>({});
+  const [sortBy, setSortBy] = useState<string>("id");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const { data, isLoading, error } = useResource(
     () => listResource(currentUser),
     [currentUser.id, reloadKey]
   );
-  const isEditing = editId != null;
+
+  const sortFieldOptions = useMemo(
+    () => [{ value: "id", label: "ID" }, ...fields.map((field) => ({ value: field.key, label: field.label }))],
+    [fields]
+  );
+
   const filteredItems = useMemo(() => {
     const items = data?.items ?? [];
     const query = searchQuery.trim().toLowerCase();
@@ -65,18 +74,45 @@ export function ResourceCrudPage({
     );
   }, [data?.items, fields, searchQuery]);
 
-  function setField(key: string, value: string) {
-    setForm((previous) => ({
+  const sortedItems = useMemo(() => {
+    const items = [...filteredItems];
+    items.sort((left, right) => {
+      const leftValue = sortBy === "id" ? left.id : left[sortBy];
+      const rightValue = sortBy === "id" ? right.id : right[sortBy];
+      const comparison = String(leftValue ?? "").localeCompare(String(rightValue ?? ""), undefined, {
+        numeric: true,
+        sensitivity: "base"
+      });
+
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+
+    return items;
+  }, [filteredItems, sortBy, sortDirection]);
+
+  function setCreateField(key: string, value: string) {
+    setCreateForm((previous) => ({
       ...previous,
       [key]: value
     }));
-    setFieldErrors((previous) => ({
+    setCreateFieldErrors((previous) => ({
       ...previous,
       [key]: ""
     }));
   }
 
-  function normalizePayload() {
+  function setEditField(key: string, value: string) {
+    setEditForm((previous) => ({
+      ...previous,
+      [key]: value
+    }));
+    setEditFieldErrors((previous) => ({
+      ...previous,
+      [key]: ""
+    }));
+  }
+
+  function normalizePayload(form: Record<string, string>) {
     const payload: Record<string, string> = {};
     for (const [key, value] of Object.entries(form)) {
       const trimmed = value.trim();
@@ -87,11 +123,15 @@ export function ResourceCrudPage({
     return payload;
   }
 
-  function resetForm() {
-    setForm(createTemplate);
+  function resetCreateForm() {
+    setCreateForm(createTemplate);
+    setCreateFieldErrors({});
+  }
+
+  function resetEditForm() {
     setEditId(null);
-    setFieldErrors({});
-    setFeedback("");
+    setEditForm(createTemplate);
+    setEditFieldErrors({});
   }
 
   function validateRequired(payload: Record<string, string>) {
@@ -105,11 +145,26 @@ export function ResourceCrudPage({
     return nextErrors;
   }
 
+  useEffect(() => {
+    if (!editId) {
+      return;
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        resetEditForm();
+      }
+    };
+
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [editId]);
+
   async function handleCreate() {
-    const payload = normalizePayload();
+    const payload = normalizePayload(createForm);
     const validationErrors = validateRequired(payload);
     if (Object.keys(validationErrors).length > 0) {
-      setFieldErrors(validationErrors);
+      setCreateFieldErrors(validationErrors);
       setFeedback("Fix the highlighted fields before saving.");
       return;
     }
@@ -117,7 +172,7 @@ export function ResourceCrudPage({
     try {
       await createResource(currentUser, payload);
       setFeedback(`${resourceLabel} created.`);
-      resetForm();
+      resetCreateForm();
       setReloadKey((value) => value + 1);
     } catch (createError) {
       setFeedback(createError instanceof Error ? createError.message : "Create failed.");
@@ -128,10 +183,10 @@ export function ResourceCrudPage({
     if (!editId) {
       return;
     }
-    const payload = normalizePayload();
+    const payload = normalizePayload(editForm);
     const validationErrors = validateRequired(payload);
     if (Object.keys(validationErrors).length > 0) {
-      setFieldErrors(validationErrors);
+      setEditFieldErrors(validationErrors);
       setFeedback("Fix the highlighted fields before saving.");
       return;
     }
@@ -139,7 +194,7 @@ export function ResourceCrudPage({
     try {
       await updateResource(currentUser, editId, payload);
       setFeedback(`${resourceLabel} updated.`);
-      resetForm();
+      resetEditForm();
       setReloadKey((value) => value + 1);
     } catch (updateError) {
       setFeedback(updateError instanceof Error ? updateError.message : "Update failed.");
@@ -166,59 +221,35 @@ export function ResourceCrudPage({
       subtitle={subtitle}
       activeRoute={activeRoute}
     >
-      <section className="resource-workspace">
-        <aside className="resource-panel resource-editor">
-          <header className="resource-header">
-            <div>
-              <p className="eyebrow">{isEditing ? "Edit record" : "Create record"}</p>
-              <h2>{resourceLabel}</h2>
-              <p className="panel-summary">
-                {isEditing
-                  ? "Update the selected row without leaving the current list."
-                  : "Create a new record with inline validation and immediate feedback."}
-              </p>
-            </div>
-          </header>
-
-          <div className="resource-form resource-form-stacked">
-            {fields.map((field) => (
-              <label className="resource-field" key={field.key}>
-                <span>
-                  {field.label}
-                  {field.required ? " *" : ""}
-                </span>
-                <input
-                  className={fieldErrors[field.key] ? "resource-input resource-input-error" : "resource-input"}
-                  onChange={(event) => setField(field.key, event.target.value)}
-                  placeholder={field.placeholder}
-                  value={form[field.key] ?? ""}
-                />
-                {fieldErrors[field.key] && <small className="field-error">{fieldErrors[field.key]}</small>}
-              </label>
-            ))}
+      <section className="resource-panel">
+        <header className="resource-header">
+          <div>
+            <p className="eyebrow">Create record</p>
+            <h2>{resourceLabel}</h2>
           </div>
+        </header>
 
-          <div className="resource-actions-row">
-            {isEditing ? (
-              <button className="resource-action" onClick={handleUpdate} type="button">
-                Save {resourceLabel}
-              </button>
-            ) : (
-              <button className="resource-action" onClick={handleCreate} type="button">
-                Create {resourceLabel}
-              </button>
-            )}
-            {isEditing && (
-              <button className="resource-action subtle" onClick={resetForm} type="button">
-                Cancel
-              </button>
-            )}
-          </div>
+        <div className="resource-form">
+          {fields.map((field) => (
+            <input
+              key={field.key}
+              className={createFieldErrors[field.key] ? "resource-input resource-input-error" : "resource-input"}
+              onChange={(event) => setCreateField(field.key, event.target.value)}
+              placeholder={`${field.label}${field.required ? " *" : ""}`}
+              value={createForm[field.key] ?? ""}
+            />
+          ))}
+          <button className="resource-action" onClick={handleCreate} type="button">
+            Create {resourceLabel}
+          </button>
+        </div>
 
-          {feedback && <p className="panel-summary" role="status">{feedback}</p>}
-        </aside>
+        {Object.values(createFieldErrors).filter(Boolean).length > 0 && (
+          <p className="field-error">Fix required fields before saving.</p>
+        )}
+        {feedback && <p className="panel-summary" role="status">{feedback}</p>}
 
-        <section className="resource-panel resource-list">
+        <section className="resource-list">
           <header className="resource-header">
             <div>
               <p className="eyebrow">Live Data</p>
@@ -247,6 +278,17 @@ export function ResourceCrudPage({
           )}
           {data && filteredItems.length > 0 && (
             <div className="table-shell">
+              <div className="resource-actions-row" style={{ marginBottom: 12 }}>
+                <select className="resource-input" onChange={(event) => setSortBy(event.target.value)} value={sortBy}>
+                  {sortFieldOptions.map((option) => (
+                    <option key={option.value} value={option.value}>Sort: {option.label}</option>
+                  ))}
+                </select>
+                <select className="resource-input" onChange={(event) => setSortDirection(event.target.value as "asc" | "desc")} value={sortDirection}>
+                  <option value="asc">Ascending</option>
+                  <option value="desc">Descending</option>
+                </select>
+              </div>
               <table className="resource-table">
                 <thead>
                   <tr>
@@ -258,7 +300,7 @@ export function ResourceCrudPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredItems.map((item) => {
+                  {sortedItems.map((item) => {
                     const resourceId = item.id != null ? String(item.id) : "";
                     return (
                       <tr key={resourceId || JSON.stringify(item)}>
@@ -275,9 +317,9 @@ export function ResourceCrudPage({
                                 for (const config of fields) {
                                   nextForm[config.key] = String(item[config.key] ?? "");
                                 }
-                                setForm(nextForm);
+                                setEditForm(nextForm);
                                 setEditId(resourceId);
-                                setFieldErrors({});
+                                setEditFieldErrors({});
                                 setFeedback(`Editing ${resourceLabel.toLowerCase()} ${resourceId}.`);
                               }}
                               type="button"
@@ -304,6 +346,47 @@ export function ResourceCrudPage({
           )}
         </section>
       </section>
+
+      {editId && (
+        <div className="edit-overlay-backdrop" onClick={resetEditForm} aria-hidden="true">
+          <section
+            className="resource-panel edit-overlay-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Edit ${resourceLabel}`}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="resource-header">
+              <div>
+                <p className="eyebrow">Edit record</p>
+                <h2>{resourceLabel}</h2>
+              </div>
+            </header>
+            <div className="resource-form">
+              {fields.map((field) => (
+                <input
+                  key={field.key}
+                  className={editFieldErrors[field.key] ? "resource-input resource-input-error" : "resource-input"}
+                  onChange={(event) => setEditField(field.key, event.target.value)}
+                  placeholder={`${field.label}${field.required ? " *" : ""}`}
+                  value={editForm[field.key] ?? ""}
+                />
+              ))}
+            </div>
+            {Object.values(editFieldErrors).filter(Boolean).length > 0 && (
+              <p className="field-error">Fix required fields before saving.</p>
+            )}
+            <div className="resource-actions-row edit-overlay-actions">
+              <button className="resource-action" onClick={handleUpdate} type="button">
+                Save {resourceLabel}
+              </button>
+              <button className="resource-action subtle" onClick={resetEditForm} type="button">
+                Cancel
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </AppShell>
   );
 }

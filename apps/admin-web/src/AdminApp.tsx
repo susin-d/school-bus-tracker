@@ -20,7 +20,7 @@ import { StudentsPage } from "./features/students/StudentsPage";
 import { UsersPage } from "./features/users/UsersPage";
 
 export function AdminApp() {
-  const { currentUser } = useAdminSession();
+  const { currentUser, isBootstrapping } = useAdminSession();
   const { currentRoute, navigate } = useAdminRouter();
   const canAccessCurrentRoute = currentUser
     ? canAccessRoute(currentUser.role, currentRoute)
@@ -38,6 +38,10 @@ export function AdminApp() {
 
   if (currentRoute === "login") {
     return <AdminAuthScreen />;
+  }
+
+  if (isBootstrapping) {
+    return null;
   }
 
   if (!currentUser) {

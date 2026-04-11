@@ -4,8 +4,6 @@ import type { RealtimeEventEnvelope } from "@school-bus/shared";
 import { AppShell } from "../../app/AppShell";
 import {
   bulkGeocodeStudentsBySchool,
-  createStreamToken,
-  getApiBaseUrl,
   getSchoolMapSettings,
   listRealtimeMapEvents,
   listLiveDriversMap,
@@ -69,12 +67,8 @@ export function LiveMapPage() {
   const [dispatchStartTime, setDispatchStartTime] = useState("");
   const [noShowWaitSeconds, setNoShowWaitSeconds] = useState("120");
   const [maxDetourMinutes, setMaxDetourMinutes] = useState("15");
-  const [streamEvents, setStreamEvents] = useState<RealtimeEventEnvelope[]>([]);
-  const [sseConnected, setSseConnected] = useState(false);
   const [selectedTripId, setSelectedTripId] = useState<string | undefined>(undefined);
   const [mapError, setMapError] = useState<string | undefined>(undefined);
-  const [streamError, setStreamError] = useState<string | undefined>(undefined);
-  const lastEventTimeRef = useRef<string | undefined>(undefined);
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -123,7 +117,7 @@ export function LiveMapPage() {
 
   const delayedCount = data?.drivers.filter((driver) => driver.isDelayed).length ?? 0;
   const driverCount = data?.drivers.length ?? 0;
-  const baseEvents = streamEvents.length > 0 ? streamEvents : (eventsData?.events ?? []);
+  const baseEvents = (eventsData?.events ?? []) as RealtimeEventEnvelope[];
   const recentEvents = baseEvents
     .filter((event) => (selectedTripId ? event.tripId === selectedTripId : true))
     .slice(0, 8);
@@ -165,80 +159,6 @@ export function LiveMapPage() {
     }
     return Array.from(cells.values()).sort((left, right) => right.total - left.total);
   }, [data?.drivers]);
-
-  useEffect(() => {
-    let cancelled = false;
-    let source: EventSource | null = null;
-    let reconnectTimer: number | undefined;
-    let reconnectAttempt = 0;
-    const reconnectDelays = [1000, 2000, 5000, 10000, 30000];
-
-    const connect = async () => {
-      try {
-        const tokenPayload = await createStreamToken(currentUser, {
-          schoolId: schoolScope,
-          tripId: selectedTripId
-        });
-        if (cancelled) {
-          return;
-        }
-
-        const query = new URLSearchParams({
-          streamToken: tokenPayload.streamToken
-        });
-        if (schoolScope) {
-          query.set("schoolId", schoolScope);
-        }
-        if (selectedTripId) {
-          query.set("tripId", selectedTripId);
-        }
-        if (lastEventTimeRef.current) {
-          query.set("since", lastEventTimeRef.current);
-        }
-
-        source = new EventSource(`${getApiBaseUrl()}/maps/events/stream?${query.toString()}`);
-        source.onopen = () => {
-          reconnectAttempt = 0;
-          setSseConnected(true);
-          setStreamError(undefined);
-        };
-        source.onmessage = (event) => {
-          try {
-            const parsed = JSON.parse(event.data) as RealtimeEventEnvelope;
-            lastEventTimeRef.current = parsed.occurredAt;
-            setStreamEvents((previous) => [parsed, ...previous].slice(0, 30));
-          } catch {
-            setStreamError("Received malformed realtime event payload; stream is still connected.");
-          }
-        };
-        source.onerror = () => {
-          setSseConnected(false);
-          source?.close();
-          source = null;
-          const delay = reconnectDelays[Math.min(reconnectAttempt, reconnectDelays.length - 1)]!;
-          reconnectAttempt += 1;
-          reconnectTimer = window.setTimeout(() => {
-            void connect();
-          }, delay);
-        };
-      } catch {
-        setSseConnected(false);
-        setStreamError("Realtime stream unavailable; retrying with polling fallback.");
-      }
-    };
-
-    void connect();
-
-    return () => {
-      cancelled = true;
-      if (reconnectTimer) {
-        window.clearTimeout(reconnectTimer);
-      }
-      setSseConnected(false);
-      setStreamError(undefined);
-      source?.close();
-    };
-  }, [currentUser.id, schoolScope, selectedTripId]);
 
   useEffect(() => {
     if (!data?.drivers?.length || !mapContainerRef.current) {
@@ -384,7 +304,7 @@ export function LiveMapPage() {
   return (
     <AppShell
       title="Live Driver Map"
-      subtitle="Monitor every active bus, trigger geocoding, and run hybrid route optimization."
+      subtitle=""
       activeRoute="liveMap"
     >
       <section className="stats-grid">
@@ -395,13 +315,12 @@ export function LiveMapPage() {
           value={schoolScope ?? "All"}
         />
         <MetricCard label="Refresh Interval" value="10s" />
-        <MetricCard label="Realtime Stream" value={sseConnected ? "SSE Connected" : "Polling Fallback"} />
+        <MetricCard label="Realtime Stream" value="Polling" />
       </section>
 
-      <section className="resource-panel" style={{ marginTop: 20 }}>
+      <section className="resource-panel">
         <header className="resource-header">
           <div>
-            <p className="eyebrow">Dispatch Actions</p>
             <h2>Routing Controls</h2>
           </div>
         </header>
@@ -434,11 +353,10 @@ export function LiveMapPage() {
         {actionFeedback && <p className="panel-summary">{actionFeedback}</p>}
       </section>
 
-      <section className="resource-panel" style={{ marginTop: 20 }}>
+      <section className="resource-panel">
         <header className="resource-header">
           <div>
-            <p className="eyebrow">Operational Settings</p>
-            <h2>Map + Routing Thresholds</h2>
+            <h2>Map Settings</h2>
           </div>
         </header>
         <div className="resource-form">
@@ -472,7 +390,7 @@ export function LiveMapPage() {
       </section>
 
       {currentUser.role === "super_admin" && driversBySchool.length > 0 && (
-        <section className="panel-grid compact" style={{ marginTop: 20 }}>
+        <section className="panel-grid compact">
           {driversBySchool.map((group) => (
             <article className="panel" key={group.schoolId}>
               <h2>School {group.schoolId}</h2>
@@ -485,7 +403,7 @@ export function LiveMapPage() {
       )}
 
       {currentUser.role === "super_admin" && schoolScope == null && driverClusters.length > 0 && (
-        <section className="panel-grid compact" style={{ marginTop: 20 }}>
+        <section className="panel-grid compact">
           {driverClusters.map((cluster) => (
             <article className="panel" key={cluster.key}>
               <h2>Cluster {cluster.key}</h2>
@@ -500,14 +418,12 @@ export function LiveMapPage() {
         </section>
       )}
 
-      <section className="resource-panel" style={{ marginTop: 20 }}>
+      <section className="resource-panel">
         <header className="resource-header">
           <div>
-            <p className="eyebrow">Realtime Events</p>
-            <h2>Latest Incidents + ETA Updates</h2>
+            <h2>Realtime Events</h2>
           </div>
         </header>
-        {streamError && <p className="panel-summary error-copy">{streamError}</p>}
         <div className="panel-grid compact">
           {recentEvents.map((event) => (
             <article className="panel" key={event.id}>
@@ -521,18 +437,15 @@ export function LiveMapPage() {
           {recentEvents.length === 0 && (
             <article className="panel panel-span-all">
               <h2>No recent events</h2>
-              <p className="panel-summary">
-                Realtime map events will appear here once trips publish updates.
-              </p>
+              <p className="panel-summary">No trip updates yet.</p>
             </article>
           )}
         </div>
       </section>
 
-      <section className="resource-panel" style={{ marginTop: 20 }}>
+      <section className="resource-panel">
         <header className="resource-header">
           <div>
-            <p className="eyebrow">Google Maps</p>
             <h2>Live Vehicle Map</h2>
           </div>
         </header>
@@ -552,7 +465,7 @@ export function LiveMapPage() {
       {isLoading && <p className="panel-summary">Loading live drivers map data.</p>}
       {error && <p className="panel-summary error-copy">{error}</p>}
       {data && (
-        <section className="panel-grid compact" style={{ marginTop: 20 }}>
+        <section className="panel-grid compact">
           {data.drivers.map((driver) => {
             return (
               <article className="panel" key={`${driver.tripId}-${driver.driverId ?? "driver"}`}>
@@ -580,9 +493,7 @@ export function LiveMapPage() {
           {data.drivers.length === 0 && (
             <article className="panel panel-span-all">
               <h2>No active driver location</h2>
-              <p className="panel-summary">
-                There are currently no active trips publishing location in this scope.
-              </p>
+              <p className="panel-summary">No active trips in this scope.</p>
             </article>
           )}
         </section>

@@ -1,10 +1,9 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { AppShell } from "../../app/AppShell";
 import { acknowledgeAlert, listAlerts, resolveAlert } from "../../core/api";
 import { useRequiredAdminUser } from "../../core/auth";
 import { useResource } from "../../core/useResource";
-import { AlertsOverview } from "./AlertsOverview";
 
 export function AlertsPage() {
   const currentUser = useRequiredAdminUser();
@@ -12,16 +11,35 @@ export function AlertsPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [statusFilter, setStatusFilter] = useState("all");
   const [severityFilter, setSeverityFilter] = useState("all");
+  const [sortBy, setSortBy] = useState<"type" | "severity" | "status">("severity");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const { data, isLoading, error } = useResource(
     () => listAlerts(currentUser),
     [currentUser.id, reloadKey]
   );
 
-  const filteredAlerts = (data?.alerts ?? []).filter((alert) => {
-    const statusMatches = statusFilter === "all" || alert.status === statusFilter;
-    const severityMatches = severityFilter === "all" || alert.severity === severityFilter;
-    return statusMatches && severityMatches;
-  });
+  const filteredAlerts = useMemo(
+    () =>
+      (data?.alerts ?? []).filter((alert) => {
+        const statusMatches = statusFilter === "all" || alert.status === statusFilter;
+        const severityMatches = severityFilter === "all" || alert.severity === severityFilter;
+        return statusMatches && severityMatches;
+      }),
+    [data?.alerts, severityFilter, statusFilter]
+  );
+
+  const sortedAlerts = useMemo(() => {
+    const items = [...filteredAlerts];
+    items.sort((left, right) => {
+      const leftValue = sortBy === "type" ? left.type : sortBy === "status" ? left.status : left.severity;
+      const rightValue = sortBy === "type" ? right.type : sortBy === "status" ? right.status : right.severity;
+      const comparison = String(leftValue).localeCompare(String(rightValue), undefined, {
+        sensitivity: "base"
+      });
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+    return items;
+  }, [filteredAlerts, sortBy, sortDirection]);
 
   async function handleAcknowledge(alertId: string) {
     try {
@@ -53,10 +71,7 @@ export function AlertsPage() {
       }
       activeRoute="alerts"
     >
-      <section className="panel-grid compact" style={{ marginTop: 20 }}>
-        <AlertsOverview view={currentUser.role === "super_admin" ? "super_admin" : "school_admin"} />
-      </section>
-      <section className="resource-panel resource-workspace">
+      <section className="resource-panel">
         <header className="resource-header">
           <div>
             <p className="eyebrow">Live Data</p>
@@ -84,6 +99,18 @@ export function AlertsPage() {
           <span>{data?.alerts.length ?? 0} total</span>
         </div>
 
+        <div className="resource-actions-row" style={{ marginBottom: 12 }}>
+          <select className="resource-input" onChange={(event) => setSortBy(event.target.value as "type" | "severity" | "status")} value={sortBy}>
+            <option value="severity">Sort: Severity</option>
+            <option value="status">Sort: Status</option>
+            <option value="type">Sort: Type</option>
+          </select>
+          <select className="resource-input" onChange={(event) => setSortDirection(event.target.value as "asc" | "desc")} value={sortDirection}>
+            <option value="desc">Descending</option>
+            <option value="asc">Ascending</option>
+          </select>
+        </div>
+
         {isLoading && <p className="panel-summary">Loading alerts from the backend.</p>}
         {error && <p className="panel-summary error-copy">{error}</p>}
         {feedback && <p className="panel-summary" role="status">{feedback}</p>}
@@ -106,7 +133,7 @@ export function AlertsPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredAlerts.map((alert) => (
+                {sortedAlerts.map((alert) => (
                   <tr key={alert.id}>
                     <td>{alert.type}</td>
                     <td>{alert.severity}</td>

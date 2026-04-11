@@ -1,10 +1,9 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { AppShell } from "../../app/AppShell";
-import { createStudent, deleteStudent, geocodeStudentAddress, listStudents, updateStudent } from "../../core/api";
+import { createStudent, deleteStudent, listStudents, updateStudent } from "../../core/api";
 import { useRequiredAdminUser } from "../../core/auth";
 import { useResource } from "../../core/useResource";
-import { StudentsOverview } from "./StudentsOverview";
 
 export function StudentsPage() {
   const currentUser = useRequiredAdminUser();
@@ -15,11 +14,71 @@ export function StudentsPage() {
   const [feedback, setFeedback] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
   const [editId, setEditId] = useState<string | null>(null);
+  const [editFullName, setEditFullName] = useState("");
+  const [editGrade, setEditGrade] = useState("");
+  const [editAddressText, setEditAddressText] = useState("");
+  const [editSchoolId, setEditSchoolId] = useState(currentUser.schoolId ?? "");
+  const [sortBy, setSortBy] = useState<"name" | "grade" | "school" | "id">("name");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
   const { data, isLoading, error } = useResource(
     () => listStudents(currentUser),
     [currentUser.id, reloadKey]
   );
+  const sortedStudents = useMemo(() => {
+    const items = [...(data?.items ?? [])];
+    const getName = (student: Record<string, unknown>) => String(student.full_name ?? student.name ?? "");
+    const getGrade = (student: Record<string, unknown>) => String(student.grade ?? "");
+    const getSchool = (student: Record<string, unknown>) => String(student.school_id ?? "");
+    const getId = (student: Record<string, unknown>) => String(student.id ?? "");
+
+    items.sort((left, right) => {
+      const leftValue =
+        sortBy === "name"
+          ? getName(left)
+          : sortBy === "grade"
+            ? getGrade(left)
+            : sortBy === "school"
+              ? getSchool(left)
+              : getId(left);
+      const rightValue =
+        sortBy === "name"
+          ? getName(right)
+          : sortBy === "grade"
+            ? getGrade(right)
+            : sortBy === "school"
+              ? getSchool(right)
+              : getId(right);
+
+      const comparison = leftValue.localeCompare(rightValue, undefined, { numeric: true, sensitivity: "base" });
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+
+    return items;
+  }, [data?.items, sortBy, sortDirection]);
+
+  function resetEditForm() {
+    setEditId(null);
+    setEditFullName("");
+    setEditGrade("");
+    setEditAddressText("");
+    setEditSchoolId(currentUser.schoolId ?? "");
+  }
+
+  useEffect(() => {
+    if (!editId) {
+      return;
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        resetEditForm();
+      }
+    };
+
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [editId]);
 
   async function handleCreateStudent() {
     if (!fullName.trim()) {
@@ -63,35 +122,28 @@ export function StudentsPage() {
       return;
     }
 
+    if (!editFullName.trim()) {
+      setFeedback("Student name is required.");
+      return;
+    }
+
+    if (!editGrade.trim()) {
+      setFeedback("Grade is required.");
+      return;
+    }
+
     try {
       await updateStudent(currentUser, editId, {
-        full_name: fullName.trim(),
-        grade: grade.trim(),
-        address_text: addressText.trim() || undefined,
-        school_id: currentUser.role === "super_admin" ? (schoolId.trim() || undefined) : undefined
+        full_name: editFullName.trim(),
+        grade: editGrade.trim(),
+        address_text: editAddressText.trim() || undefined,
+        school_id: currentUser.role === "super_admin" ? (editSchoolId.trim() || undefined) : undefined
       });
-      setEditId(null);
-      setFullName("");
-      setGrade("");
-      setAddressText("");
+      resetEditForm();
       setFeedback("Student updated.");
       setReloadKey((value) => value + 1);
     } catch (updateError) {
       setFeedback(updateError instanceof Error ? updateError.message : "Update failed.");
-    }
-  }
-
-  async function handleGeocodeStudent(studentId: string, rowAddress?: string) {
-    try {
-      const result = await geocodeStudentAddress(currentUser, studentId, rowAddress);
-      if (result.geocodeStatus === "resolved") {
-        setFeedback(`Geocoded ${studentId}: ${result.latitude}, ${result.longitude}`);
-      } else {
-        setFeedback(`Geocode failed for ${studentId}: ${result.error ?? "unknown error"}`);
-      }
-      setReloadKey((value) => value + 1);
-    } catch (geocodeError) {
-      setFeedback(geocodeError instanceof Error ? geocodeError.message : "Geocode failed.");
     }
   }
 
@@ -105,9 +157,6 @@ export function StudentsPage() {
       }
       activeRoute="students"
     >
-      <section className="panel-grid compact" style={{ marginTop: 20 }}>
-        <StudentsOverview view={currentUser.role === "super_admin" ? "super_admin" : "school_admin"} />
-      </section>
       <section className="resource-panel">
         <header className="resource-header">
           <div>
@@ -142,15 +191,9 @@ export function StudentsPage() {
               value={schoolId}
             />
           )}
-          {editId == null ? (
-            <button className="resource-action" onClick={handleCreateStudent} type="button">
-              Create Student
-            </button>
-          ) : (
-            <button className="resource-action" onClick={handleUpdateStudent} type="button">
-              Save Student
-            </button>
-          )}
+          <button className="resource-action" onClick={handleCreateStudent} type="button">
+            Create Student
+          </button>
         </div>
         {feedback && <p className="panel-summary">{feedback}</p>}
 
@@ -158,6 +201,18 @@ export function StudentsPage() {
         {error && <p className="panel-summary error-copy">{error}</p>}
         {data && (
           <div className="table-shell">
+            <div className="resource-actions-row" style={{ marginBottom: 12 }}>
+              <select className="resource-input" onChange={(event) => setSortBy(event.target.value as "name" | "grade" | "school" | "id")} value={sortBy}>
+                <option value="name">Sort: Name</option>
+                <option value="grade">Sort: Grade</option>
+                <option value="school">Sort: School</option>
+                <option value="id">Sort: ID</option>
+              </select>
+              <select className="resource-input" onChange={(event) => setSortDirection(event.target.value as "asc" | "desc")} value={sortDirection}>
+                <option value="asc">Ascending</option>
+                <option value="desc">Descending</option>
+              </select>
+            </div>
             <table className="resource-table">
               <thead>
                 <tr>
@@ -171,7 +226,7 @@ export function StudentsPage() {
                 </tr>
               </thead>
               <tbody>
-                {data.items.map((student) => (
+                {sortedStudents.map((student) => (
                   <tr key={String(student.id ?? Math.random())}>
                     <td>{String(student.id ?? "n/a")}</td>
                     <td>{String(student.full_name ?? student.name ?? "Unnamed Student")}</td>
@@ -187,26 +242,12 @@ export function StudentsPage() {
                       {student.id != null && (
                         <button
                           className="resource-action subtle"
-                          onClick={() =>
-                            void handleGeocodeStudent(
-                              String(student.id),
-                              String(student.address_text ?? student.address ?? "")
-                            )
-                          }
-                          type="button"
-                        >
-                          Geocode
-                        </button>
-                      )}
-                      {student.id != null && (
-                        <button
-                          className="resource-action subtle"
                           onClick={() => {
                             setEditId(String(student.id));
-                            setFullName(String(student.full_name ?? student.name ?? ""));
-                            setGrade(String(student.grade ?? ""));
-                            setAddressText(String(student.address_text ?? student.address ?? ""));
-                            setSchoolId(String(student.school_id ?? currentUser.schoolId ?? ""));
+                            setEditFullName(String(student.full_name ?? student.name ?? ""));
+                            setEditGrade(String(student.grade ?? ""));
+                            setEditAddressText(String(student.address_text ?? student.address ?? ""));
+                            setEditSchoolId(String(student.school_id ?? currentUser.schoolId ?? ""));
                           }}
                           type="button"
                         >
@@ -230,6 +271,61 @@ export function StudentsPage() {
           </div>
         )}
       </section>
+
+      {editId && (
+        <div className="edit-overlay-backdrop" onClick={resetEditForm} aria-hidden="true">
+          <section
+            className="resource-panel edit-overlay-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Edit student"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="resource-header">
+              <div>
+                <p className="eyebrow">Edit Student</p>
+                <h2>Update Student Record</h2>
+              </div>
+            </header>
+            <div className="resource-form">
+              <input
+                className="resource-input"
+                onChange={(event) => setEditFullName(event.target.value)}
+                placeholder="Student name"
+                value={editFullName}
+              />
+              <input
+                className="resource-input"
+                onChange={(event) => setEditGrade(event.target.value)}
+                placeholder="Grade"
+                value={editGrade}
+              />
+              <input
+                className="resource-input"
+                onChange={(event) => setEditAddressText(event.target.value)}
+                placeholder="Address"
+                value={editAddressText}
+              />
+              {currentUser.role === "super_admin" && (
+                <input
+                  className="resource-input"
+                  onChange={(event) => setEditSchoolId(event.target.value)}
+                  placeholder="School ID"
+                  value={editSchoolId}
+                />
+              )}
+            </div>
+            <div className="resource-actions-row edit-overlay-actions">
+              <button className="resource-action" onClick={handleUpdateStudent} type="button">
+                Save Student
+              </button>
+              <button className="resource-action subtle" onClick={resetEditForm} type="button">
+                Cancel
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </AppShell>
   );
 }

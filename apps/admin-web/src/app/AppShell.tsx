@@ -37,12 +37,14 @@ type AppShellProps = PropsWithChildren<{
   title: string;
   subtitle: string;
   activeRoute: AdminRouteKey;
+  hideHeader?: boolean;
 }>;
 
 export function AppShell({
   title,
   subtitle,
   activeRoute,
+  hideHeader = true,
   children
 }: AppShellProps) {
   const { currentUser, signOutSession } = useAdminSession();
@@ -95,14 +97,6 @@ export function AppShell({
             <p className="eyebrow">SchoolBus Bridge</p>
             <h2 className="app-sidebar-title">Admin Console</h2>
           </div>
-          <button
-            className="app-sidebar-close"
-            onClick={() => setSidebarOpen(false)}
-            type="button"
-            aria-label="Close navigation"
-          >
-            Close
-          </button>
         </div>
 
         <div className="app-sidebar-profile panel-surface">
@@ -153,40 +147,49 @@ export function AppShell({
       </aside>
 
       <section className="app-content">
-        <header className="app-content-header">
-          <div className="app-topbar">
-            <button className="app-sidebar-toggle" onClick={() => setSidebarOpen(true)} type="button">
-              Menu
-            </button>
-            <div className="app-topbar-actions">
-              <button className="subnav-link" onClick={() => navigate("liveMap")} type="button">
-                Live Map
+        {hideHeader && (
+          <button className="app-sidebar-toggle" onClick={() => setSidebarOpen(true)} type="button">
+            Menu
+          </button>
+        )}
+        {!hideHeader && (
+          <header className="app-content-header">
+            <div className="app-topbar">
+              <button className="app-sidebar-toggle" onClick={() => setSidebarOpen(true)} type="button">
+                Menu
               </button>
-              <button className="resource-action" onClick={() => navigate("alerts")} type="button">
-                Alerts
+              <div className="app-topbar-actions">
+                <button className="subnav-link" onClick={() => navigate("liveMap")} type="button">
+                  Live Map
+                </button>
+                <button className="resource-action" onClick={() => navigate("alerts")} type="button">
+                  Alerts
+                </button>
+              </div>
+            </div>
+
+            <nav className="app-breadcrumbs" aria-label="Breadcrumb">
+              <button className="app-breadcrumb-link" onClick={() => navigate("dashboard")} type="button">
+                Dashboard
               </button>
-            </div>
-          </div>
+              <span aria-hidden="true">/</span>
+              <span>{breadcrumbGroup}</span>
+              <span aria-hidden="true">/</span>
+              <span aria-current="page">{breadcrumbLabel}</span>
+            </nav>
 
-          <nav className="app-breadcrumbs" aria-label="Breadcrumb">
-            <button className="app-breadcrumb-link" onClick={() => navigate("dashboard")} type="button">
-              Dashboard
-            </button>
-            <span aria-hidden="true">/</span>
-            <span>{breadcrumbGroup}</span>
-            <span aria-hidden="true">/</span>
-            <span aria-current="page">{breadcrumbLabel}</span>
-          </nav>
-
-          <div className="app-content-copy">
-            <div>
-              <p className="eyebrow">{breadcrumbGroup}</p>
-              <h1>{title}</h1>
+            <div className="app-content-copy">
+              <div>
+                <p className="eyebrow">{breadcrumbGroup}</p>
+                <h1>{title}</h1>
+              </div>
+              <p className="lede">{subtitle}</p>
             </div>
-            <p className="lede">{subtitle}</p>
-          </div>
-        </header>
-        {children}
+          </header>
+        )}
+        <div className="app-page-sections">
+          {children}
+        </div>
       </section>
     </main>
   );
