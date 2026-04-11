@@ -64,6 +64,9 @@ function mapUserProfile(row: RecordMap): UserProfile {
 }
 
 function mapTripSummary(row: RecordMap): TripSummary {
+  const driverRow = row.driver as RecordMap | undefined;
+  const busRow = row.bus as RecordMap | undefined;
+
   return {
     id: asString(row.id),
     schoolId: asString(row.school_id),
@@ -78,7 +81,11 @@ function mapTripSummary(row: RecordMap): TripSummary {
       toIsoString(row.last_location_at) ??
       toIsoString(row.updated_at) ??
       toIsoString(row.started_at),
-    tripKind: (row.trip_kind as TripSummary["tripKind"]) ?? "pickup"
+    tripKind: (row.trip_kind as TripSummary["tripKind"]) ?? "pickup",
+    driverPhone: asString(driverRow?.phone_number) || undefined,
+    driverLicenseNo: asString(driverRow?.license_number) || undefined,
+    busCapacity: asNumber(busRow?.capacity),
+    busPlate: asString(busRow?.number) || undefined,
   };
 }
 
@@ -104,9 +111,11 @@ function mapTripLocation(row: RecordMap | null): TripLocation | null {
 }
 
 function mapStudentSummary(row: RecordMap): StudentSummary {
+  const rawFullName = asString(row.full_name);
+  const fullName = rawFullName || [asString(row.first_name), asString(row.last_name)].filter(Boolean).join(" ") || "Student";
   return {
     id: asString(row.student_id ?? row.id),
-    fullName: asString(row.full_name, "Student"),
+    fullName,
     grade: asString(row.grade),
     assignedBusLabel: asString(row.assigned_bus_label),
     assignedRouteName: asString(row.assigned_route_name)
@@ -175,9 +184,10 @@ function mapNightlyPlannerRun(row: RecordMap): NightlyPlannerRun {
 }
 
 async function selectOne(table: string, column: string, value: string) {
+  const selection = table === "trips" ? "*, driver:drivers(*), bus:buses(*)" : "*";
   const { data, error } = await getSupabaseAdminClient()
     .from(table)
-    .select("*")
+    .select(selection)
     .eq(column, value)
     .maybeSingle();
 
@@ -394,10 +404,10 @@ export async function getCurrentTripForUser(user: UserProfile): Promise<{
 
     const { data, error } = await getSupabaseAdminClient()
       .from("trips")
-      .select("*")
+      .select("*, driver:drivers(*), bus:buses(*)")
       .eq("school_id", user.schoolId)
       .in("id", tripIds)
-      .in("status", ["ready", "active", "paused"])
+      .in("status", ["planned", "scheduled", "ready", "active", "paused"])
       .order("updated_at", { ascending: false })
       .limit(1);
 
@@ -409,8 +419,8 @@ export async function getCurrentTripForUser(user: UserProfile): Promise<{
   } else {
     let query = getSupabaseAdminClient()
       .from("trips")
-      .select("*")
-      .in("status", ["ready", "active", "paused"])
+      .select("*, driver:drivers(*), bus:buses(*)")
+      .in("status", ["planned", "scheduled", "ready", "active", "paused"])
       .order("updated_at", { ascending: false })
       .limit(1);
 
@@ -456,15 +466,17 @@ export async function getTripById(tripId: string) {
 export async function getTripStudents(tripId: string): Promise<StudentSummary[]> {
   const { data, error } = await getSupabaseAdminClient()
     .from("trip_students")
-    .select("*")
-    .eq("trip_id", tripId)
-    .order("full_name", { ascending: true });
+    .select("*, students!inner(*)")
+    .eq("trip_id", tripId);
 
   if (error) {
     throw new HttpError(500, error.message, "trip_students_failed");
   }
 
-  return (data ?? []).map((row) => mapStudentSummary(row as RecordMap));
+  return (data ?? []).map((row) => {
+    const studentData = (row as RecordMap).students as RecordMap | undefined;
+    return mapStudentSummary({ ...(row as RecordMap), ...studentData });
+  });
 }
 
 export async function getTripStudentsForParent(
@@ -478,16 +490,18 @@ export async function getTripStudentsForParent(
 
   const { data, error } = await getSupabaseAdminClient()
     .from("trip_students")
-    .select("*")
+    .select("*, students!inner(*)")
     .eq("trip_id", tripId)
-    .in("student_id", guardianStudentIds)
-    .order("full_name", { ascending: true });
+    .in("student_id", guardianStudentIds);
 
   if (error) {
     throw new HttpError(500, error.message, "trip_students_parent_failed");
   }
 
-  return (data ?? []).map((row) => mapStudentSummary(row as RecordMap));
+  return (data ?? []).map((row) => {
+    const studentData = (row as RecordMap).students as RecordMap | undefined;
+    return mapStudentSummary({ ...(row as RecordMap), ...studentData });
+  });
 }
 
 export async function getTripLocation(tripId: string): Promise<TripLocation | null> {

@@ -18,10 +18,8 @@ const routeMap: Record<string, AdminRouteKey> = {
   "#/users": "users",
   "#/students": "students",
   "#/routes": "routes",
-  "#/stops": "stops",
   "#/buses": "buses",
   "#/drivers": "drivers",
-  "#/assignments": "assignments",
   "#/mail": "mail",
   "#/alerts": "alerts",
   "#/leaveRequests": "leaveRequests"
@@ -36,10 +34,8 @@ const reverseRouteMap: Record<AdminRouteKey, string> = {
   users: "#/users",
   students: "#/students",
   routes: "#/routes",
-  stops: "#/stops",
   buses: "#/buses",
   drivers: "#/drivers",
-  assignments: "#/assignments",
   mail: "#/mail",
   alerts: "#/alerts",
   leaveRequests: "#/leaveRequests"

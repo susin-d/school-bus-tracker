@@ -9,10 +9,8 @@ export type AdminRouteKey =
   | "users"
   | "students"
   | "routes"
-  | "stops"
   | "buses"
   | "drivers"
-  | "assignments"
   | "mail"
   | "alerts"
   | "leaveRequests";
@@ -34,10 +32,8 @@ export const routeLabels: Record<AdminRouteKey, string> = {
   users: "Users",
   students: "Students",
   routes: "Routes",
-  stops: "Stops",
   buses: "Buses",
   drivers: "Drivers",
-  assignments: "Assignments",
   mail: "Mail",
   alerts: "Alerts",
   leaveRequests: "Leave Requests"
@@ -50,10 +46,8 @@ const routeAccess: Record<Extract<Role, "admin" | "super_admin">, AdminRouteKey[
     "users",
     "students",
     "routes",
-    "stops",
     "buses",
     "drivers",
-    "assignments",
     "mail",
     "alerts",
     "leaveRequests"
@@ -65,10 +59,8 @@ const routeAccess: Record<Extract<Role, "admin" | "super_admin">, AdminRouteKey[
     "users",
     "students",
     "routes",
-    "stops",
     "buses",
     "drivers",
-    "assignments",
     "mail",
     "alerts",
     "leaveRequests"

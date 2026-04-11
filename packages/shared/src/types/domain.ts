@@ -64,6 +64,10 @@ export interface TripSummary {
   status: TripStatus;
   lastUpdatedAt?: string;
   tripKind?: "pickup" | "dropoff" | "special";
+  driverPhone?: string;
+  driverLicenseNo?: string;
+  busCapacity?: number;
+  busPlate?: string;
 }
 
 export interface TripLocation {
@@ -193,6 +197,7 @@ export interface ParentLiveTrip {
   studentId: string;
   trip: TripSummary | null;
   busLocation: TripLocation | null;
+  schoolLocation?: { latitude: number; longitude: number } | null;
   studentStop: TripStopManifestItem | null;
   nextStop: TripStopManifestItem | null;
   estimatedDropoffAt?: string;

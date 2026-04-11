@@ -518,8 +518,8 @@ async function buildAndStoreTripPlan(input: {
       continue;
     }
 
-    const latitude = asNumber(studentRow.lat);
-    const longitude = asNumber(studentRow.lng);
+    const latitude = asNumber(studentRow.latitude ?? studentRow.lat);
+    const longitude = asNumber(studentRow.longitude ?? studentRow.lng);
     if (
       latitude == null ||
       longitude == null ||
@@ -532,14 +532,16 @@ async function buildAndStoreTripPlan(input: {
       continue;
     }
 
+    const studentFullName = asString(studentRow.full_name) || [asString(studentRow.first_name), asString(studentRow.last_name)].filter(Boolean).join(" ") || undefined;
+
     activeStops.push({
       id: existingForStudent?.id,
       schoolId: input.schoolId,
       tripId,
       studentId,
       stopId: existingForStudent?.stopId,
-      studentName: tripStudentNameMap.get(studentId) || asString(studentRow.full_name) || undefined,
-      addressText: asString(studentRow.address_text) || undefined,
+      studentName: tripStudentNameMap.get(studentId) || studentFullName,
+      addressText: asString(studentRow.home_address ?? studentRow.address_text) || undefined,
       latitude,
       longitude,
       sequence: 0,
@@ -797,7 +799,7 @@ export async function optimizeDailyRoutes(input: {
     .from("trips")
     .select("*")
     .eq("school_id", input.schoolId)
-    .in("status", ["scheduled", "ready", "active", "paused"])
+    .in("status", ["planned", "scheduled", "ready", "active", "paused"])
     .order("updated_at", { ascending: false });
 
   if (error) {
@@ -1280,7 +1282,7 @@ export async function getParentLiveTrip(input: {
     .from("trips")
     .select("*")
     .in("id", tripIds)
-    .in("status", ["ready", "active", "paused"])
+    .in("status", ["planned", "scheduled", "ready", "active", "paused"])
     .order("updated_at", { ascending: false })
     .limit(1);
 
@@ -1303,15 +1305,22 @@ export async function getParentLiveTrip(input: {
   const trip = await assertUserCanAccessTrip(input.actor, tripId);
   const busLocation = await getTripLocation(tripId);
   const stops = await listTripStops(tripId);
+  const stopIdList = stops.map(s => s.id!);
   const studentStop = stops.find((stop) => stop.studentId === input.studentId) ?? null;
   const nextStop = stops
     .filter((stop) => !isCompletedStatus(stop.stopStatus))
     .sort((left, right) => left.sequence - right.sequence)[0] ?? null;
 
+  const schoolMapSettings = trip ? await selectSchoolMapSettings(trip.schoolId).catch(() => null) : null;
+  const schoolLocation = schoolMapSettings?.dispatchLatitude != null && schoolMapSettings?.dispatchLongitude != null
+    ? { latitude: schoolMapSettings.dispatchLatitude, longitude: schoolMapSettings.dispatchLongitude }
+    : null;
+
   return {
     studentId: input.studentId,
     trip,
     busLocation,
+    schoolLocation,
     studentStop: studentStop ? mapTripStop({
       id: studentStop.id,
       trip_id: studentStop.tripId,

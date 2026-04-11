@@ -241,6 +241,22 @@ async function main() {
     throw new Error(`Failed to upsert school: ${schoolError.message}`);
   }
 
+  const { error: mapSettingsError } = await client.from("school_map_settings").upsert(
+    {
+      school_id: SCHOOL.id,
+      dispatch_latitude: SCHOOL.lat,
+      dispatch_longitude: SCHOOL.lng,
+      no_show_wait_seconds: 120,
+      max_detour_minutes: 15,
+      created_at: now,
+      updated_at: now
+    },
+    { onConflict: "school_id" }
+  );
+  if (mapSettingsError) {
+    throw new Error(`Failed to upsert school_map_settings: ${mapSettingsError.message}`);
+  }
+
   const driverAuthIds = new Map<DriverSeed["key"], string>();
   for (const driver of DRIVERS) {
     const authUserId = await ensureAuthUser({
@@ -263,7 +279,6 @@ async function main() {
       auth_user_id: authUserId,
       email: driver.email,
       full_name: driver.fullName,
-      phone: driver.phone,
       role: "driver",
       school_id: SCHOOL.id,
       is_active: true,
@@ -291,8 +306,8 @@ async function main() {
       user_id: authUserId,
       first_name: firstName,
       last_name: lastName,
-      phone: driver.phone,
-      license_no: driver.licenseNo,
+      phone_number: driver.phone,
+      license_number: driver.licenseNo,
       is_active: true,
       created_at: now,
       updated_at: now
@@ -307,7 +322,7 @@ async function main() {
   const routeRows = DRIVERS.map((driver, index) => ({
     id: `chn-route-${String(index + 1).padStart(2, "0")}`,
     school_id: SCHOOL.id,
-    name: `Chennai Route ${index + 1} - ${driver.fullName.split(" ")[0]}`,
+    route_name: `Chennai Route ${index + 1} - ${driver.fullName.split(" ")[0]}`,
     description: `Morning pickup route ${index + 1} within 10km radius of IIT Chennai`,
     direction: "pickup",
     is_active: true,
@@ -323,7 +338,8 @@ async function main() {
   const busRows = DRIVERS.map((_, index) => ({
     id: `chn-bus-${String(index + 1).padStart(2, "0")}`,
     school_id: SCHOOL.id,
-    number: `CHN-${index + 1}`,
+    vehicle_number: `CHN-${index + 1}`,
+    plate: `TN 01 AB ${1000 + index + 1}`,
     capacity: 48,
     is_active: true,
     created_at: now,
@@ -342,6 +358,7 @@ async function main() {
       route_id: routeRows[index]!.id,
       bus_id: busRows[index]!.id,
       driver_id: driverRows[index]!.id,
+      direction: "pickup",
       status: "planned",
       created_at: now,
       updated_at: now
@@ -361,9 +378,9 @@ async function main() {
     last_name: student.lastName,
     grade: student.grade,
     section: student.section,
-    address_text: student.addressText,
-    lat: student.lat,
-    lng: student.lng,
+    home_address: student.addressText,
+    latitude: student.lat,
+    longitude: student.lng,
     geocode_status: "resolved",
     is_active: true,
     created_at: now,

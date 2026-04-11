@@ -4,7 +4,6 @@ import { useAdminSession } from "./core/auth";
 import { canAccessRoute } from "./core/roleAccess";
 import { useAdminRouter } from "./core/router";
 import { AlertsPage } from "./features/alerts/AlertsPage";
-import { AssignmentsPage } from "./features/assignments/AssignmentsPage";
 import { AdminAuthScreen } from "./features/auth/AdminAuthScreen";
 import { AdminLandingPage } from "./features/auth/AdminLandingPage";
 import { BusesPage } from "./features/buses/BusesPage";
@@ -15,7 +14,6 @@ import { MailPage } from "./features/mail/MailPage";
 import { LiveMapPage } from "./features/maps/LiveMapPage";
 import { RoutesPage } from "./features/routes/RoutesPage";
 import { SchoolsPage } from "./features/schools/SchoolsPage";
-import { StopsPage } from "./features/stops/StopsPage";
 import { StudentsPage } from "./features/students/StudentsPage";
 import { UsersPage } from "./features/users/UsersPage";
 
@@ -63,14 +61,10 @@ export function AdminApp() {
       return <StudentsPage />;
     case "routes":
       return <RoutesPage />;
-    case "stops":
-      return <StopsPage />;
     case "buses":
       return <BusesPage />;
     case "drivers":
       return <DriversPage />;
-    case "assignments":
-      return <AssignmentsPage />;
     case "mail":
       return <MailPage />;
     case "alerts":
