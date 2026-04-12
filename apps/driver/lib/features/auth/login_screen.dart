@@ -288,6 +288,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         accessToken: session.token,
         gender: session.gender,
         dateOfBirth: session.dateOfBirth,
+        assignedBusId: session.assignedBusId,
+        busLabel: session.busLabel,
+        busPlate: session.busPlate,
       );
 
     } catch (e) {

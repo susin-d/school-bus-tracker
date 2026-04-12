@@ -5,8 +5,11 @@
     "jsx": "react-jsx",
     "rootDir": ".",
     "outDir": "dist",
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@school-bus/shared": ["../../packages/shared/src/index.ts"],
+      "@school-bus/shared/*": ["../../packages/shared/src/*"]
     }
   },
   "include": ["src/**/*", "vite.config.ts"],

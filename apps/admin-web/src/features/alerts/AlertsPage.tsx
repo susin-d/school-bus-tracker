@@ -5,6 +5,8 @@ import { acknowledgeAlert, listAlerts, resolveAlert } from "../../core/api";
 import { useRequiredAdminUser } from "../../core/auth";
 import { useResource } from "../../core/useResource";
 
+type AlertItem = Awaited<ReturnType<typeof listAlerts>>["alerts"][number];
+
 export function AlertsPage() {
   const currentUser = useRequiredAdminUser();
   const [feedback, setFeedback] = useState("");
@@ -20,7 +22,7 @@ export function AlertsPage() {
 
   const filteredAlerts = useMemo(
     () =>
-      (data?.alerts ?? []).filter((alert) => {
+      (data?.alerts ?? []).filter((alert: AlertItem) => {
         const statusMatches = statusFilter === "all" || alert.status === statusFilter;
         const severityMatches = severityFilter === "all" || alert.severity === severityFilter;
         return statusMatches && severityMatches;
@@ -133,7 +135,7 @@ export function AlertsPage() {
                 </tr>
               </thead>
               <tbody>
-                {sortedAlerts.map((alert) => (
+                {sortedAlerts.map((alert: AlertItem) => (
                   <tr key={alert.id}>
                     <td>{alert.type}</td>
                     <td>{alert.severity}</td>

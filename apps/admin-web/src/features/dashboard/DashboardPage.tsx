@@ -23,7 +23,8 @@ import {
 import { AppShell } from "../../app/AppShell";
 import { useRequiredAdminUser } from "../../core/auth";
 import { getDashboard } from "../../core/api";
-import { DashboardSummary } from "@school-bus/shared";
+
+type DashboardSummary = Awaited<ReturnType<typeof getDashboard>>;
 
 const SAMPLE_CHART_DATA = [
   { name: "06:00", active: 20 },

@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import type { RealtimeEventEnvelope } from "@school-bus/shared";
 import { importLibrary, setOptions } from "@googlemaps/js-api-loader";
 
 import { AppShell } from "../../app/AppShell";
@@ -14,6 +13,10 @@ import {
 } from "../../core/api";
 import { useRequiredAdminUser } from "../../core/auth";
 import { useResource } from "../../core/useResource";
+
+type LiveDriver = Awaited<ReturnType<typeof listLiveDriversMap>>["drivers"][number];
+type DispatchSchool = Awaited<ReturnType<typeof listSchoolDispatchLocations>>["schools"][number];
+type RealtimeEventEnvelope = Awaited<ReturnType<typeof listRealtimeMapEvents>>["events"][number];
 
 declare global {
   interface Window {
@@ -153,8 +156,8 @@ export function LiveMapPage() {
 
   useEffect(() => {
     if (!mapContainerRef.current) return;
-    const driversWithCoords = (data?.drivers ?? []).filter((d) => d.latitude != null && d.longitude != null);
-    const schoolsWithCoords = (schoolLocationsData?.schools ?? []).filter((s) => s.latitude != null && s.longitude != null);
+    const driversWithCoords = (data?.drivers ?? []).filter((d: LiveDriver) => d.latitude != null && d.longitude != null);
+    const schoolsWithCoords = (schoolLocationsData?.schools ?? []).filter((s: DispatchSchool) => s.latitude != null && s.longitude != null);
     const settingsCenter = settingsData?.settings;
     const defaultCenter = { lat: settingsCenter?.dispatchLatitude ?? 13.0827, lng: settingsCenter?.dispatchLongitude ?? 80.2707 };
 
@@ -298,7 +301,7 @@ export function LiveMapPage() {
                 <div><h2>Active Drivers</h2></div>
               </header>
               <div className="panel-grid compact">
-                {data.drivers.map((driver) => (
+                {data.drivers.map((driver: LiveDriver) => (
                   <article
                     className={`panel${driver.isDelayed ? " panel-warn" : ""}`}
                     key={`${driver.tripId}-${driver.driverId ?? "driver"}`}

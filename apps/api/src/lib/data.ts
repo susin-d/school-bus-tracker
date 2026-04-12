@@ -53,15 +53,26 @@ function requireData<T>(data: T | null, error: { message: string; code: string; 
 }
 
 function mapUserProfile(row: RecordMap): UserProfile {
+  let fullName = asString(row.full_name);
+  if (!fullName || fullName === "Unknown User") {
+    const first = asString(row.first_name);
+    const last = asString(row.last_name);
+    fullName = [first, last].filter(Boolean).join(" ");
+  }
+  if (!fullName) fullName = "Unknown User";
+
   return {
     id: asString(row.id),
     schoolId: asString(row.school_id),
     role: (row.role as UserProfile["role"]) ?? "parent",
-    fullName: asString(row.full_name, "Unknown User"),
+    fullName,
     phoneE164: asString(row.phone_e164 || row.phone_number),
     email: typeof row.email === "string" ? row.email : undefined,
     gender: typeof row.gender === "string" ? row.gender : undefined,
-    dateOfBirth: toIsoString(row.date_of_birth)
+    dateOfBirth: toIsoString(row.date_of_birth),
+    assignedBusId: asString(row.assigned_bus_id) || undefined,
+    busLabel: asString(row.vehicle_number || row.bus_label) || undefined,
+    busPlate: asString(row.plate || row.bus_plate) || undefined,
   };
 }
 
@@ -207,8 +218,33 @@ export async function getUserProfileById(userId: string): Promise<UserProfile | 
 }
 
 export async function getUserProfileByAuthUserId(authUserId: string): Promise<UserProfile | null> {
-  const row = await selectOne("users", "auth_user_id", authUserId);
-  return row ? mapUserProfile(row) : null;
+  const admin = getSupabaseAdminClient();
+  const userRow = await selectOne("users", "auth_user_id", authUserId);
+  if (!userRow) return null;
+
+  const user = userRow as RecordMap;
+  
+  // If driver, fetch driver details and assigned bus info
+  if (user.role === "driver") {
+    const { data: driverRow } = await admin
+      .from("drivers")
+      .select("*, buses!left(vehicle_number, plate)")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (driverRow) {
+      const driver = driverRow as RecordMap;
+      const bus = driver.buses as RecordMap | undefined;
+      return mapUserProfile({
+        ...user,
+        ...driver,
+        bus_label: bus?.vehicle_number,
+        bus_plate: bus?.plate,
+      });
+    }
+  }
+
+  return mapUserProfile(user);
 }
 
 async function hasGuardianLink(parentUserId: string, studentId: string) {
@@ -506,7 +542,26 @@ export async function initializeTripForDriver(user: UserProfile): Promise<TripSu
     throw new HttpError(404, "Driver profile not found", "driver_not_found");
   }
   
-  const assignedBusId = (driver as RecordMap).assigned_bus_id as string | undefined;
+  let assignedBusId = (driver as RecordMap).assigned_bus_id as string | undefined;
+  
+  // FALLBACK: If driver record is missing assigned_bus_id, check if any bus has this driver assigned
+  if (!assignedBusId) {
+    const { data: busByDriver } = await admin
+      .from("buses")
+      .select("id")
+      .eq("driver_id", (driver as RecordMap).id)
+      .maybeSingle();
+      
+    if (busByDriver) {
+      assignedBusId = busByDriver.id;
+      // Self-heal: Update driver record for future consistency
+      await admin
+        .from("drivers")
+        .update({ assigned_bus_id: assignedBusId })
+        .eq("id", (driver as RecordMap).id);
+    }
+  }
+
   if (!assignedBusId) {
     throw new HttpError(400, "No bus assigned to this driver. Please contact admin.", "no_bus_assigned");
   }
@@ -514,7 +569,7 @@ export async function initializeTripForDriver(user: UserProfile): Promise<TripSu
   // 2. Find the route for this bus
   const { data: bus, error: busError } = await admin
     .from("buses")
-    .select("route_id, bus_number")
+    .select("route_id, vehicle_number, plate")
     .eq("id", assignedBusId)
     .maybeSingle();
     
@@ -1132,7 +1187,7 @@ const adminResourceFieldMap: Record<AdminResource, readonly string[]> = {
   users: ["full_name", "role", "is_active", "school_id", "phone_number", "email"],
   routes: ["route_name", "route_code", "description", "direction", "status", "school_id"],
   stops: ["stop_name", "address", "latitude", "longitude", "route_id", "sequence_order", "school_id", "is_active"],
-  buses: ["bus_number", "vehicle_number", "capacity", "status", "driver_id", "route_id", "gps_device_id", "school_id", "is_active"],
+  buses: ["vehicle_number", "plate", "capacity", "status", "driver_id", "route_id", "gps_device_id", "school_id", "is_active"],
   drivers: ["user_id", "full_name", "phone_number", "email", "license_number", "status", "assigned_bus_id", "school_id", "is_active", "password"],
   students: ["first_name", "last_name", "grade", "class", "section", "roll_number", "pickup_stop_id", "drop_stop_id", "route_id", "assigned_bus_id", "transport_status", "home_address", "latitude", "longitude", "school_id", "is_active", "email", "password"],
   assignments: ["student_id", "route_id", "stop_id", "bus_id", "status", "school_id"]
@@ -1164,8 +1219,8 @@ function applyAdminResourceAliases(resource: AdminResource, payload: AdminResour
   }
 
   if (resource === "buses") {
-    if (normalized.label != null && normalized.bus_number == null) {
-      normalized.bus_number = normalized.label;
+    if (normalized.label != null && normalized.vehicle_number == null) {
+      normalized.vehicle_number = normalized.label;
     }
     if (normalized.registration_no != null && normalized.vehicle_number == null) {
       normalized.vehicle_number = normalized.registration_no;

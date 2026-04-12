@@ -52,6 +52,10 @@ export interface UserProfile {
   email?: string;
   gender?: string;
   dateOfBirth?: string;
+  // Driver specific
+  assignedBusId?: string;
+  busLabel?: string;
+  busPlate?: string;
 }
 
 

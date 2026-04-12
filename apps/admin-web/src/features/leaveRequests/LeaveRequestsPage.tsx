@@ -5,6 +5,8 @@ import { listLeaveRequests, updateLeaveRequestStatus } from "../../core/api";
 import { useRequiredAdminUser } from "../../core/auth";
 import { useResource } from "../../core/useResource";
 
+type LeaveRequestItem = Awaited<ReturnType<typeof listLeaveRequests>>["requests"][number];
+
 export function LeaveRequestsPage() {
   const currentUser = useRequiredAdminUser();
   const [feedback, setFeedback] = useState("");
@@ -19,7 +21,7 @@ export function LeaveRequestsPage() {
 
   const filteredRequests = useMemo(
     () =>
-      (data?.requests ?? []).filter((requestItem) =>
+      (data?.requests ?? []).filter((requestItem: LeaveRequestItem) =>
         statusFilter === "all" ? true : requestItem.status === statusFilter
       ),
     [data?.requests, statusFilter]
@@ -103,7 +105,7 @@ export function LeaveRequestsPage() {
                 </tr>
               </thead>
               <tbody>
-                {sortedRequests.map((requestItem) => (
+                {sortedRequests.map((requestItem: LeaveRequestItem) => (
                   <tr key={requestItem.id}>
                     <td>{requestItem.id}</td>
                     <td>{requestItem.studentId}</td>

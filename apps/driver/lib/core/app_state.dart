@@ -10,6 +10,9 @@ class LoggedInUser {
     this.accessToken,
     this.gender,
     this.dateOfBirth,
+    this.assignedBusId,
+    this.busLabel,
+    this.busPlate,
   });
 
   final String id;
@@ -18,6 +21,9 @@ class LoggedInUser {
   final String? accessToken;
   final String? gender;
   final String? dateOfBirth;
+  final String? assignedBusId;
+  final String? busLabel;
+  final String? busPlate;
 
   int? get age {
     if (dateOfBirth == null) return null;
@@ -105,6 +111,9 @@ class AppState extends ChangeNotifier {
     String? accessToken,
     String? gender,
     String? dateOfBirth,
+    String? assignedBusId,
+    String? busLabel,
+    String? busPlate,
   }) {
     _currentUser = LoggedInUser(
       id: userId,
@@ -113,6 +122,9 @@ class AppState extends ChangeNotifier {
       accessToken: accessToken,
       gender: gender,
       dateOfBirth: dateOfBirth,
+      assignedBusId: assignedBusId,
+      busLabel: busLabel,
+      busPlate: busPlate,
     );
     notifyListeners();
   }

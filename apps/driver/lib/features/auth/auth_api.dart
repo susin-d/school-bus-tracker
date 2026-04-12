@@ -37,6 +37,9 @@ class AuthApi {
       role: AppRole.driver,
       gender: user['gender'] as String?,
       dateOfBirth: user['dateOfBirth'] as String?,
+      assignedBusId: user['assignedBusId'] as String?,
+      busLabel: user['busLabel'] as String?,
+      busPlate: user['busPlate'] as String?,
     );
   }
 }
@@ -49,6 +52,9 @@ class VerifiedSession {
     required this.role,
     this.gender,
     this.dateOfBirth,
+    this.assignedBusId,
+    this.busLabel,
+    this.busPlate,
   });
 
   final String token;
@@ -57,4 +63,7 @@ class VerifiedSession {
   final AppRole role;
   final String? gender;
   final String? dateOfBirth;
+  final String? assignedBusId;
+  final String? busLabel;
+  final String? busPlate;
 }

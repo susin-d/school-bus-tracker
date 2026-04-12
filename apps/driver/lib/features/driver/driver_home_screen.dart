@@ -38,6 +38,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
 
   Future<void> _checkForTrip() async {
     setState(() => _loading = true);
+    final user = AppScope.of(context).currentUser!;
     try {
       final api = _buildApi();
       final payload = await api.getCurrentTrip();
@@ -59,13 +60,13 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         );
         AppScope.of(context).setTrip(tripData);
       } else {
-        // Use placeholders if no active trip to show UI layout
-        AppScope.of(context).setTrip(const TripData(
+        // Use real profile data even if no active trip
+        AppScope.of(context).setTrip(TripData(
           id: 'dummy',
           status: 'ready',
-          busNo: 'BUS001',
-          plateNumber: 'TN 09 AB 1234',
-          driverPhone: '+91 98765 12345',
+          busNo: user.busLabel ?? 'CHN-1',
+          plateNumber: user.busPlate ?? 'TN 01 AB 1001',
+          driverName: user.fullName,
         ));
       }
     } catch (_) {
