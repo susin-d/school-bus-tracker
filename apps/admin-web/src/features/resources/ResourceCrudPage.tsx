@@ -245,38 +245,40 @@ export function ResourceCrudPage({
       activeRoute={activeRoute}
     >
       <section className="resource-panel">
-        <header className="resource-header">
-          <div>
-            <p className="eyebrow">Create record</p>
-            <h2>{resourceLabel}</h2>
-          </div>
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              setIsCreateOpen(true);
-              setFeedback(`Creating a new ${resourceLabel.toLowerCase()} record.`);
-            }}
-          >
-            <button className="resource-action" type="submit">
-              Create {resourceLabel}
-            </button>
-          </form>
-        </header>
-        {feedback && <p className="panel-summary" role="status">{feedback}</p>}
-
         <section className="resource-list">
           <header className="resource-header">
-            <div>
+            <div className="flex flex-col gap-1">
               <p className="eyebrow">Live Data</p>
-              <h2>{resourceLabel} list</h2>
+              <h2 className="text-xl font-extrabold">{resourceLabel} list</h2>
             </div>
-            <input
-              className="resource-input resource-search"
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder={`Search ${resourceLabel.toLowerCase()}`}
-              value={searchQuery}
-            />
+            
+            <div className="flex items-center gap-3">
+              <input
+                className="resource-input resource-search"
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder={`Search ${resourceLabel.toLowerCase()}...`}
+                style={{ maxWidth: 280 }}
+                value={searchQuery}
+              />
+              <button 
+                className="resource-action" 
+                onClick={() => {
+                  setIsCreateOpen(true);
+                  setFeedback(`Creating a new ${resourceLabel.toLowerCase()} record.`);
+                }}
+                type="button"
+              >
+                Create {resourceLabel}
+              </button>
+            </div>
           </header>
+
+          {feedback && (
+            <div className="px-4 py-2 mb-4 rounded-lg bg-orange-50 border border-orange-100 text-orange-800 text-sm font-semibold flex items-center justify-between">
+              <span>{feedback}</span>
+              <button onClick={() => setFeedback("")} className="hover:opacity-70">✕</button>
+            </div>
+          )}
 
           <div className="resource-meta">
             <span>{filteredItems.length} visible</span>
