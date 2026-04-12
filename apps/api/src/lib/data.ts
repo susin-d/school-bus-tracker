@@ -80,6 +80,16 @@ function mapUserProfile(row: RecordMap): UserProfile {
 function mapTripSummary(row: RecordMap): TripSummary {
   const driverRow = row.driver as RecordMap | undefined;
   const busRow = row.bus as RecordMap | undefined;
+  
+  const rawStatus = asString(row.status);
+  let status: TripSummary["status"] = "scheduled";
+  
+  if (rawStatus === "planned") status = "ready";
+  else if (rawStatus === "dispatched" || rawStatus === "in_progress") status = "active";
+  else if (rawStatus === "completed") status = "completed";
+  else if (rawStatus === "cancelled") status = "cancelled";
+  else if (rawStatus === "ready") status = "ready";
+  else if (rawStatus === "active") status = "active";
 
   return {
     id: asString(row.id),
@@ -90,7 +100,7 @@ function mapTripSummary(row: RecordMap): TripSummary {
     routeName: asString(row.route_name, "Assigned Route"),
     busLabel: asString(row.bus_label, "Assigned Bus"),
     driverName: asString(row.driver_name, "Assigned Driver"),
-    status: (row.status as TripSummary["status"]) ?? "scheduled",
+    status,
     lastUpdatedAt:
       toIsoString(row.last_location_at) ??
       toIsoString(row.updated_at) ??
@@ -593,7 +603,7 @@ export async function initializeTripForDriver(user: UserProfile): Promise<TripSu
       bus_id: assignedBusId,
       route_id: routeId,
       direction: "pickup", // Default to pickup for now
-      status: "ready",
+      status: "planned",
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     })
