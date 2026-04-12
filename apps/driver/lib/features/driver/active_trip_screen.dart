@@ -22,6 +22,7 @@ class ActiveTripScreen extends StatefulWidget {
 class _ActiveTripScreenState extends State<ActiveTripScreen> {
   StreamSubscription<Position>? _positionStream;
   Position? _currentPosition;
+  GoogleMapController? _mapController;
   List<Map<String, dynamic>> _stops = [];
   BitmapDescriptor? _busIcon;
   BitmapDescriptor? _stopIcon;
@@ -123,6 +124,18 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
             _lastMapUpdatePosition = position;
             _lastMapUpdateHeading = position.heading;
             _polylines = _calculatePolylines(position);
+            
+            // Auto-follow logic
+            _mapController?.animateCamera(
+              CameraUpdate.newCameraPosition(
+                CameraPosition(
+                  target: LatLng(position.latitude, position.longitude),
+                  zoom: 16,
+                  bearing: position.heading,
+                  tilt: 45,
+                ),
+              ),
+            );
           }
         });
 
@@ -155,6 +168,8 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
 
   void _checkGeofences(Position pos) {
     if (_showingArrivalDialog) return;
+    final trip = AppScope.of(context).currentTrip;
+    if (trip?.status != 'active') return;
 
     final nextStop = _getNextStop();
     if (nextStop == null) return;
@@ -304,9 +319,10 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
         children: [
           // Google Map
           GoogleMap(
-            initialCameraPosition: const CameraPosition(target: LatLng(12.9716, 77.5946), zoom: 15),
+            initialCameraPosition: const CameraPosition(target: LatLng(13.0827, 80.2707), zoom: 15),
             myLocationEnabled: true,
             myLocationButtonEnabled: false,
+            onMapCreated: (controller) => _mapController = controller,
             markers: {
               if (_currentPosition != null)
                 Marker(
@@ -351,9 +367,20 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
                 if (trip?.status == 'ready' || trip?.status == 'scheduled')
                   _StartTripOverlay(
                     onStart: () async {
-                      final api = _buildApi();
-                      await api.startTrip(trip!.id);
-                      _loadManifest();
+                      try {
+                        final api = _buildApi();
+                        await api.startTrip(trip!.id);
+                        if (context.mounted) {
+                          AppScope.of(context).updateTripStatus('active');
+                          await _loadManifest();
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Failed to start trip: $e')),
+                          );
+                        }
+                      }
                     },
                   ),
                 if (isAtSchool && trip?.status == 'active')

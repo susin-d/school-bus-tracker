@@ -19,6 +19,7 @@ import {
   getCurrentTripForUser,
   getTripById,
   getTripLocation,
+  initializeTripForDriver,
   reassignTripDriver,
   updateTripStatus
 } from "../../lib/data.js";
@@ -40,6 +41,16 @@ tripsRouter.get("/current", asyncHandler(async (request, response) => {
   };
 
   response.json(payload);
+}));
+
+tripsRouter.post("/initialize", requireRole("driver"), asyncHandler(async (request, response) => {
+  const user = request.currentUser!;
+  const trip = await initializeTripForDriver(user);
+
+  response.status(201).json({
+    ok: true,
+    trip
+  });
 }));
 
 tripsRouter.get("/:tripId/location", asyncHandler(async (request, response) => {

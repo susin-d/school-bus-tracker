@@ -28,11 +28,15 @@ export function StudentsPage() {
         latitude: "",
         longitude: "",
         school_id: "",
-        is_active: "true"
+        is_active: "true",
+        email: "",
+        password: ""
       }}
       fields={[
         { key: "first_name", label: "First Name", placeholder: "First name", required: true },
         { key: "last_name", label: "Last Name", placeholder: "Last name", required: true },
+        { key: "email", label: "Parent Email", placeholder: "parent@example.com", required: true },
+        { key: "password", label: "Account Password", placeholder: "••••••••", required: true },
         { key: "grade", label: "Grade", placeholder: "Grade" },
         { key: "class", label: "Class", placeholder: "Class" },
         { key: "section", label: "Section", placeholder: "Section" },
@@ -46,7 +50,16 @@ export function StudentsPage() {
         { key: "latitude", label: "Latitude", placeholder: "13.0827" },
         { key: "longitude", label: "Longitude", placeholder: "80.2707" },
         { key: "school_id", label: "School ID", placeholder: "School ID" },
-        { key: "is_active", label: "Is Active", placeholder: "true" }
+        {
+          key: "is_active",
+          label: "Is Active",
+          placeholder: "Select status",
+          type: "select",
+          options: [
+            { value: "true", label: "Active" },
+            { value: "false", label: "Inactive" }
+          ]
+        }
       ]}
     />
   );

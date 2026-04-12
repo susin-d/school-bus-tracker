@@ -18,10 +18,10 @@ export function DriversPage() {
       updateResource={updateDriver}
       deleteResource={deleteDriver}
       createTemplate={{
-        user_id: "",
         full_name: "",
         phone_number: "",
         email: "",
+        password: "",
         license_number: "",
         assigned_bus_id: "",
         status: "active",
@@ -29,15 +29,24 @@ export function DriversPage() {
         school_id: ""
       }}
       fields={[
-        { key: "user_id", label: "User ID", placeholder: "Linked user id", required: true },
         { key: "full_name", label: "Full Name", placeholder: "Driver name", required: true },
-        { key: "phone_number", label: "Phone", placeholder: "Phone number" },
-        { key: "email", label: "Email", placeholder: "driver@school.com" },
+        { key: "phone_number", label: "Phone", placeholder: "Phone number", required: true },
+        { key: "email", label: "Login Email", placeholder: "driver@school.com", required: true },
+        { key: "password", label: "Login Password", placeholder: "••••••••", required: true },
         { key: "license_number", label: "License", placeholder: "License number" },
         { key: "assigned_bus_id", label: "Assigned Bus", placeholder: "Bus ID" },
         { key: "status", label: "Status", placeholder: "active" },
-        { key: "is_active", label: "Is Active", placeholder: "true" },
-        { key: "school_id", label: "School", placeholder: "School ID (super admin only)" }
+        {
+          key: "is_active",
+          label: "Is Active",
+          placeholder: "Select status",
+          type: "select",
+          options: [
+            { value: "true", label: "Active" },
+            { value: "false", label: "Inactive" }
+          ]
+        },
+        { key: "school_id", label: "School ID", placeholder: "Optional school identifier" }
       ]}
     />
   );

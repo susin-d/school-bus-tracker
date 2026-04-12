@@ -492,6 +492,83 @@ export async function getCurrentTripForUser(user: UserProfile): Promise<{
   };
 }
 
+export async function initializeTripForDriver(user: UserProfile): Promise<TripSummary> {
+  const admin = getSupabaseAdminClient();
+  
+  // 1. Find the driver profile and their assigned bus/route
+  const { data: driver, error: driverError } = await admin
+    .from("drivers")
+    .select("id, assigned_bus_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+    
+  if (driverError || !driver) {
+    throw new HttpError(404, "Driver profile not found", "driver_not_found");
+  }
+  
+  const assignedBusId = (driver as RecordMap).assigned_bus_id as string | undefined;
+  if (!assignedBusId) {
+    throw new HttpError(400, "No bus assigned to this driver. Please contact admin.", "no_bus_assigned");
+  }
+  
+  // 2. Find the route for this bus
+  const { data: bus, error: busError } = await admin
+    .from("buses")
+    .select("route_id, bus_number")
+    .eq("id", assignedBusId)
+    .maybeSingle();
+    
+  if (busError || !bus) {
+    throw new HttpError(404, "Assigned bus not found", "bus_not_found");
+  }
+  
+  const routeId = (bus as RecordMap).route_id as string | undefined;
+  if (!routeId) {
+    throw new HttpError(400, "Assigned bus has no route. Please contact admin.", "no_route_assigned");
+  }
+  
+  // 3. Create the trip
+  const tripId = `trip-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+  const { data: newTrip, error: createError } = await admin
+    .from("trips")
+    .insert({
+      id: tripId,
+      school_id: user.schoolId,
+      driver_id: (driver as RecordMap).id,
+      bus_id: assignedBusId,
+      route_id: routeId,
+      direction: "pickup", // Default to pickup for now
+      status: "ready",
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    })
+    .select()
+    .single();
+    
+  if (createError || !newTrip) {
+    throw new HttpError(500, `Failed to initialize trip: ${createError?.message}`, "trip_init_failed");
+  }
+
+  // 4. Trigger student sync (optional but good for consistency)
+  // Our getCurrentTripForUser will handle this automatically on first load,
+  // but let's pre-populate it to be safe.
+  const { data: assignments } = await admin
+    .from("student_transport_assignments")
+    .select("student_id")
+    .eq("route_id", routeId)
+    .eq("is_active", true);
+    
+  if (assignments && assignments.length > 0) {
+    const linkPayloads = assignments.map((assign) => ({
+      trip_id: tripId,
+      student_id: (assign as RecordMap).student_id
+    }));
+    await admin.from("trip_students").insert(linkPayloads);
+  }
+  
+  return mapTripSummary(newTrip as RecordMap);
+}
+
 export async function getTripById(tripId: string) {
   const row = await selectOne("trips", "id", tripId);
   return row ? mapTripSummary(row) : null;
@@ -1051,13 +1128,13 @@ export type AdminResource = keyof typeof adminCollectionMap;
 type AdminResourcePayload = Record<string, unknown>;
 
 const adminResourceFieldMap: Record<AdminResource, readonly string[]> = {
-  schools: ["name", "address", "latitude", "longitude", "is_active", "school_id"],
+  schools: ["name", "address", "latitude", "longitude", "is_active", "school_id", "email", "password"],
   users: ["full_name", "role", "is_active", "school_id", "phone_number", "email"],
   routes: ["route_name", "route_code", "description", "direction", "status", "school_id"],
   stops: ["stop_name", "address", "latitude", "longitude", "route_id", "sequence_order", "school_id", "is_active"],
   buses: ["bus_number", "vehicle_number", "capacity", "status", "driver_id", "route_id", "gps_device_id", "school_id", "is_active"],
-  drivers: ["user_id", "full_name", "phone_number", "email", "license_number", "status", "assigned_bus_id", "school_id", "is_active"],
-  students: ["first_name", "last_name", "grade", "class", "section", "roll_number", "pickup_stop_id", "drop_stop_id", "route_id", "assigned_bus_id", "transport_status", "home_address", "latitude", "longitude", "school_id", "is_active"],
+  drivers: ["user_id", "full_name", "phone_number", "email", "license_number", "status", "assigned_bus_id", "school_id", "is_active", "password"],
+  students: ["first_name", "last_name", "grade", "class", "section", "roll_number", "pickup_stop_id", "drop_stop_id", "route_id", "assigned_bus_id", "transport_status", "home_address", "latitude", "longitude", "school_id", "is_active", "email", "password"],
   assignments: ["student_id", "route_id", "stop_id", "bus_id", "status", "school_id"]
 };
 
@@ -1198,22 +1275,27 @@ export async function listAdminResources(
 
 export async function createAdminResource(resource: AdminResource, schoolId: string | undefined, payload: Record<string, unknown>) {
   const sanitized = sanitizeAdminResourcePayload(resource, payload, schoolId);
-  const basePayload: Record<string, unknown> = {
+  const adminClient = getSupabaseAdminClient();
+  
+  const email = typeof payload.email === "string" ? payload.email.trim() : "";
+  const password = typeof payload.password === "string" ? payload.password.trim() : "";
+  const hasAuth = email.length > 0 && password.length > 0;
+
+  let finalPayload: Record<string, unknown> = {
     ...sanitized,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   };
 
-  // Special handling for users: Create Auth account if email/password provided
-  if (resource === "users" && typeof payload.email === "string" && typeof payload.password === "string") {
-    const adminClient = getSupabaseAdminClient();
+  // 1. Pre-creation hooks (e.g. creating user for driver first to get user_id)
+  if (resource === "drivers" && hasAuth) {
     const { data: authUser, error: authError } = await adminClient.auth.admin.createUser({
-      email: payload.email,
-      password: payload.password,
+      email,
+      password,
       email_confirm: true,
       user_metadata: {
         full_name: sanitized.full_name,
-        role: sanitized.role
+        role: "driver"
       }
     });
 
@@ -1221,20 +1303,125 @@ export async function createAdminResource(resource: AdminResource, schoolId: str
       throw new HttpError(400, authError.message, "auth_user_create_failed");
     }
 
-    basePayload.auth_user_id = authUser.user.id;
+    // Insert user record in public.users
+    const userRow = {
+      id: authUser.user.id,
+      school_id: sanitized.school_id,
+      role: "driver",
+      full_name: sanitized.full_name,
+      phone_number: sanitized.phone_number,
+      email: email,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    const { error: userInsertError } = await adminClient.from("users").insert(userRow);
+    if (userInsertError) {
+      await adminClient.auth.admin.deleteUser(authUser.user.id);
+      throw new HttpError(500, userInsertError.message, "user_record_create_failed");
+    }
+
+    finalPayload.user_id = authUser.user.id;
   }
 
-  const { data, error } = await getSupabaseAdminClient()
+  // 2. Main resource creation
+  // Strip email/password from insertion payload if they aren't in the DB table
+  const insertionPayload = { ...finalPayload };
+  delete insertionPayload.email;
+  delete insertionPayload.password;
+
+  const { data, error } = await adminClient
     .from(getAdminTable(resource))
-    .insert(basePayload)
-    .select("*")
+    .insert(insertionPayload)
+    .select()
     .single();
 
   if (error) {
     throw new HttpError(500, error.message, `${resource}_create_failed`);
   }
 
-  return data;
+  const resultRow = data as RecordMap;
+
+  // 3. Post-creation hooks
+  if (resource === "schools" && hasAuth) {
+    const { data: authUser, error: authError } = await adminClient.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: {
+        full_name: `${sanitized.name} Admin`,
+        role: "admin",
+        school_id: resultRow.id
+      }
+    });
+
+    if (authError) {
+      throw new HttpError(400, authError.message, "school_admin_auth_failed");
+    }
+
+    await adminClient.from("users").insert({
+      id: authUser.user.id,
+      school_id: resultRow.id,
+      role: "admin",
+      full_name: `${sanitized.name} Admin`,
+      email: email,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    });
+  }
+
+  if (resource === "students" && hasAuth) {
+    const { data: authUser, error: authError } = await adminClient.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: {
+        full_name: `Parent of ${sanitized.first_name}`,
+        role: "parent",
+        school_id: sanitized.school_id
+      }
+    });
+
+    if (!authError) {
+      await adminClient.from("users").insert({
+        id: authUser.user.id,
+        school_id: sanitized.school_id,
+        role: "parent",
+        full_name: `Parent of ${sanitized.first_name}`,
+        email: email,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+
+      // Link as guardian
+      await adminClient.from("student_guardians").insert({
+        parent_id: authUser.user.id,
+        student_id: resultRow.id,
+        created_at: new Date().toISOString()
+      });
+    }
+  }
+
+  // Handle standard user creation (if explicitly creating from users page)
+  if (resource === "users" && hasAuth) {
+     const { data: authUser, error: authError } = await adminClient.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: {
+        full_name: sanitized.full_name,
+        role: sanitized.role
+      }
+    });
+
+    if (!authError) {
+       await adminClient.from("users").update({
+         id: authUser.user.id
+       }).eq("id", resultRow.id);
+    }
+  }
+
+  return resultRow;
 }
 
 export async function updateAdminResource(
@@ -1244,28 +1431,29 @@ export async function updateAdminResource(
   payload: Record<string, unknown>
 ) {
   const sanitized = sanitizeAdminResourcePayload(resource, payload, schoolId);
-  const basePayload: Record<string, unknown> = {
-    ...sanitized,
-    updated_at: new Date().toISOString()
-  };
+  const basePayload = { ...sanitized };
+  delete basePayload.email;
+  delete basePayload.password;
 
-  // Special handling for user passwords
-  if (resource === "users" && typeof payload.password === "string" && payload.password.trim().length > 0) {
-    const adminClient = getSupabaseAdminClient();
-    const { data: existingUser, error: lookupError } = await adminClient
-      .from("users")
-      .select("auth_user_id")
-      .eq("id", resourceId)
-      .maybeSingle();
+  const adminClient = getSupabaseAdminClient();
 
-    if (lookupError) {
-      throw new HttpError(500, lookupError.message, "user_lookup_failed");
+  // If password change is requested...
+  if (typeof payload.password === "string" && (payload.password as string).trim()) {
+    let authUserId: string | null = null;
+    
+    if (resource === "users") {
+      authUserId = resourceId;
+    } else if (resource === "drivers") {
+      const { data: driverRow } = await adminClient.from("drivers").select("user_id").eq("id", resourceId).maybeSingle();
+      authUserId = driverRow?.user_id || null;
+    } else if (resource === "students") {
+       const { data: linkage } = await adminClient.from("student_guardians").select("parent_id").eq("student_id", resourceId).maybeSingle();
+       authUserId = linkage?.parent_id || null;
     }
 
-    const authUserId = existingUser?.auth_user_id;
-    if (typeof authUserId === "string" && authUserId) {
+    if (authUserId) {
       const { error: authError } = await adminClient.auth.admin.updateUserById(authUserId, {
-        password: payload.password
+        password: payload.password as string
       });
 
       if (authError) {
@@ -1274,7 +1462,7 @@ export async function updateAdminResource(
     }
   }
 
-  let query = getSupabaseAdminClient()
+  let query = adminClient
     .from(getAdminTable(resource))
     .update(basePayload)
     .eq("id", resourceId);

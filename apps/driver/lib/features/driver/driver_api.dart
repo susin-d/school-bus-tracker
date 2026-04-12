@@ -15,6 +15,11 @@ class DriverApi {
     return payload;
   }
 
+  Future<Map<String, dynamic>> initializeTrip() async {
+    final payload = await _client.post('/trips/initialize', const <String, dynamic>{}) as Map<String, dynamic>;
+    return payload;
+  }
+
   Future<Map<String, dynamic>> startTrip(String tripId) async {
     final payload = await _client.post('/trips/$tripId/start', const <String, dynamic>{}) as Map<String, dynamic>;
     return payload;

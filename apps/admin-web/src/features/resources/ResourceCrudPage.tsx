@@ -24,6 +24,8 @@ type ResourceCrudPageProps = {
     label: string;
     placeholder: string;
     required?: boolean;
+    type?: "text" | "password" | "select";
+    options?: Array<{ value: string; label: string }>;
   }>;
 };
 
@@ -381,28 +383,50 @@ export function ResourceCrudPage({
                 </div>
               </header>
               <div className="resource-form">
-                {fields.map((field) => (
-                  field.key === "is_active" ? (
-                    <select
-                      key={field.key}
-                      className={editFieldErrors[field.key] ? "resource-input resource-input-error" : "resource-input"}
-                      onChange={(event) => setEditField(field.key, event.target.value)}
-                      value={editForm[field.key] ?? "true"}
-                    >
-                      <option value="true">Active</option>
-                      <option value="false">Inactive</option>
-                    </select>
-                  ) : (
-                    <input
-                      key={field.key}
-                      type={field.key === "password" ? "password" : "text"}
-                      className={editFieldErrors[field.key] ? "resource-input resource-input-error" : "resource-input"}
-                      onChange={(event) => setEditField(field.key, event.target.value)}
-                      placeholder={`${field.label}${field.required ? " *" : ""}`}
-                      value={editForm[field.key] ?? ""}
-                    />
-                  )
-                ))}
+                {fields.map((field) => {
+                  const isError = !!editFieldErrors[field.key];
+                  const className = isError ? "resource-input resource-input-error" : "resource-input";
+                  
+                  if (field.type === "select" || field.key === "is_active") {
+                    const options = field.options ?? [
+                      { value: "true", label: "Active" },
+                      { value: "false", label: "Inactive" }
+                    ];
+                    
+                    return (
+                      <div key={field.key} className="form-group">
+                        <label className="input-label">
+                          {field.label} {field.required && <span style={{ opacity: 0.6, fontSize: '0.7rem' }}>(Required)</span>}
+                        </label>
+                        <select
+                          className={className}
+                          onChange={(event) => setEditField(field.key, event.target.value)}
+                          value={editForm[field.key] ?? options[0].value}
+                        >
+                          {options.map(opt => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={field.key} className="form-group">
+                      <label className="input-label">
+                        {field.label} {field.required && <span style={{ opacity: 0.6, fontSize: '0.7rem' }}>(Required)</span>}
+                      </label>
+                      <input
+                        type={field.type === "password" || field.key === "password" ? "password" : "text"}
+                        className={className}
+                        onChange={(event) => setEditField(field.key, event.target.value)}
+                        placeholder={field.placeholder}
+                        value={editForm[field.key] ?? ""}
+                        required={field.required}
+                      />
+                    </div>
+                  );
+                })}
               </div>
               {Object.values(editFieldErrors).filter(Boolean).length > 0 && (
                 <p className="field-error">Fix required fields before saving.</p>
@@ -444,28 +468,50 @@ export function ResourceCrudPage({
                 </div>
               </header>
               <div className="resource-form">
-                {fields.map((field) => (
-                  field.key === "is_active" ? (
-                    <select
-                      key={field.key}
-                      className={createFieldErrors[field.key] ? "resource-input resource-input-error" : "resource-input"}
-                      onChange={(event) => setCreateField(field.key, event.target.value)}
-                      value={createForm[field.key] ?? "true"}
-                    >
-                      <option value="true">Active</option>
-                      <option value="false">Inactive</option>
-                    </select>
-                  ) : (
-                    <input
-                      key={field.key}
-                      type={field.key === "password" ? "password" : "text"}
-                      className={createFieldErrors[field.key] ? "resource-input resource-input-error" : "resource-input"}
-                      onChange={(event) => setCreateField(field.key, event.target.value)}
-                      placeholder={`${field.label}${field.required ? " *" : ""}`}
-                      value={createForm[field.key] ?? ""}
-                    />
-                  )
-                ))}
+                {fields.map((field) => {
+                  const isError = !!createFieldErrors[field.key];
+                  const className = isError ? "resource-input resource-input-error" : "resource-input";
+                  
+                  if (field.type === "select" || field.key === "is_active") {
+                    const options = field.options ?? [
+                      { value: "true", label: "Active" },
+                      { value: "false", label: "Inactive" }
+                    ];
+                    
+                    return (
+                      <div key={field.key} className="form-group">
+                        <label className="input-label">
+                          {field.label} {field.required && <span style={{ opacity: 0.6, fontSize: '0.7rem' }}>(Required)</span>}
+                        </label>
+                        <select
+                          className={className}
+                          onChange={(event) => setCreateField(field.key, event.target.value)}
+                          value={createForm[field.key] ?? options[0].value}
+                        >
+                          {options.map(opt => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div key={field.key} className="form-group">
+                      <label className="input-label">
+                        {field.label} {field.required && <span style={{ opacity: 0.6, fontSize: '0.7rem' }}>(Required)</span>}
+                      </label>
+                      <input
+                        type={field.type === "password" || field.key === "password" ? "password" : "text"}
+                        className={className}
+                        onChange={(event) => setCreateField(field.key, event.target.value)}
+                        placeholder={field.placeholder}
+                        value={createForm[field.key] ?? ""}
+                        required={field.required}
+                      />
+                    </div>
+                  );
+                })}
               </div>
               {Object.values(createFieldErrors).filter(Boolean).length > 0 && (
                 <p className="field-error">Fix required fields before saving.</p>

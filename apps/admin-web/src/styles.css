@@ -431,6 +431,22 @@ a:focus-visible {
   box-shadow: 0 0 0 4px var(--primary-glow);
 }
 
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.input-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-left: 0.25rem;
+}
+
 .metric-card {
   padding: 1.5rem;
   border-radius: var(--radius-2xl);

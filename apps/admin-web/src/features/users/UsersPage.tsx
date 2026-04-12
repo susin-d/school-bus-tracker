@@ -24,7 +24,19 @@ export function UsersPage() {
         { key: "full_name", label: "Full Name", placeholder: "Full name", required: true },
         { key: "email", label: "Email", placeholder: "name@school.com", required: true },
         { key: "password", label: "Password", placeholder: "Min 6 characters" },
-        { key: "role", label: "Role", placeholder: "parent | driver | admin | super_admin", required: true },
+        {
+          key: "role",
+          label: "Role",
+          placeholder: "Select role",
+          required: true,
+          type: "select",
+          options: [
+            { value: "parent", label: "Parent" },
+            { value: "driver", label: "Driver" },
+            { value: "admin", label: "School Admin" },
+            { value: "super_admin", label: "Super Admin (Antigravity)" }
+          ]
+        },
         { key: "is_active", label: "Is Active", placeholder: "true" },
         { key: "school_id", label: "School ID", placeholder: "School ID" },
         { key: "phone_number", label: "Phone", placeholder: "+91..." }

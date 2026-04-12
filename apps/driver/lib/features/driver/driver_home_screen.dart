@@ -52,9 +52,9 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           routeName: trip['routeName'] as String?,
           driverName: trip['driverName'] as String?,
           studentCount: (trip['studentCount'] as int?) ?? 0,
-          busNo: trip['busNo'] as String? ?? 'BUS001',
-          plateNumber: trip['plateNumber'] as String? ?? 'TN 09 AB 1234',
-          driverPhone: trip['driverPhone'] as String? ?? '+91 98765 12345',
+          busNo: (trip['busLabel'] ?? trip['busNo'] ?? 'BUS001').toString(),
+          plateNumber: (trip['busPlate'] ?? trip['plateNumber'] ?? 'TN 09 AB 1234').toString(),
+          driverPhone: (trip['driverPhone'] ?? '+91 98765 12345').toString(),
           raw: trip,
         );
         AppScope.of(context).setTrip(tripData);
@@ -137,15 +137,34 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                     childAspectRatio: 0.85,
                     children: [
                       _QuickActionCard(
-                        title: 'Start Trip',
-                        subtitle: 'Begin route',
+                        title: (trip?.id == 'dummy' || trip == null) ? 'Initialize' : 'Start Trip',
+                        subtitle: (trip?.id == 'dummy' || trip == null) ? 'Create route' : 'Begin route',
                         icon: Icons.navigation_rounded,
                         color: AppColors.orange,
                         isDark: isDark,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const ActiveTripScreen()),
-                        ).then((_) => _checkForTrip()),
+                        onTap: () async {
+                          if (trip?.id == 'dummy' || trip == null) {
+                            setState(() => _loading = true);
+                            try {
+                              final api = _buildApi();
+                              await api.initializeTrip();
+                              await _checkForTrip();
+                            } catch (e) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Failed to initialize: $e')),
+                                );
+                              }
+                            } finally {
+                              if (mounted) setState(() => _loading = false);
+                            }
+                          } else {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const ActiveTripScreen()),
+                            ).then((_) => _checkForTrip());
+                          }
+                        },
                       ),
                       _QuickActionCard(
                         title: 'Announce',
