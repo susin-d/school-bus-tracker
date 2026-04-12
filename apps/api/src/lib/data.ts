@@ -449,10 +449,41 @@ export async function getCurrentTripForUser(user: UserProfile): Promise<{
   }
 
   const trip = mapTripSummary(row);
-  const students =
+  let students =
     user.role === "parent"
       ? await getTripStudentsForParent(trip.id, user.id)
       : await getTripStudents(trip.id);
+
+  // BUGFIX: Synchronize master assignments if trip is empty for a driver
+  if (user.role === "driver" && students.length === 0 && trip.routeId) {
+    const admin = getSupabaseAdminClient();
+    
+    // Fetch master assignments for this route
+    const { data: assignments, error: assignError } = await admin
+      .from("student_transport_assignments")
+      .select("student_id")
+      .eq("route_id", trip.routeId)
+      .eq("is_active", true);
+    
+    if (!assignError && assignments && assignments.length > 0) {
+      // Create trip_students links
+      const linkPayloads = assignments.map((assign) => ({
+        trip_id: trip.id,
+        student_id: (assign as RecordMap).student_id,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }));
+      
+      const { error: insertError } = await admin
+        .from("trip_students")
+        .insert(linkPayloads);
+        
+      if (!insertError) {
+        // Re-fetch the student list
+        students = await getTripStudents(trip.id);
+      }
+    }
+  }
 
   return {
     trip,
@@ -926,11 +957,31 @@ async function countRows(table: string, schoolId?: string, filters: Record<strin
 }
 
 export async function getDashboardSummary(schoolId?: string): Promise<DashboardSummary> {
-  const [activeTrips, unresolvedAlerts, onboardStudents] = await Promise.all([
+  const now = new Date();
+  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString();
+
+  const [activeTrips, unresolvedAlerts, assignedStudents] = await Promise.all([
     countRows("trips", schoolId, { status: "active" }),
     countRows("alerts", schoolId, { status: "open" }),
-    countRows("attendance_events", schoolId, { event_type: "boarded" })
+    countRows("student_transport_assignments", schoolId, { is_active: true })
   ]);
+
+  // For onboardStudents, we count 'boarded' events for today
+  let onboardStudents = 0;
+  {
+    let query = getSupabaseAdminClient()
+      .from("attendance_events")
+      .select("id", { count: "exact", head: true })
+      .eq("event_type", "boarded")
+      .gte("recorded_at", today);
+    
+    if (schoolId) {
+      query = query.eq("school_id", schoolId);
+    }
+    
+    const { count } = await query;
+    onboardStudents = count ?? 0;
+  }
 
   let delayedTrips = 0;
   {
@@ -956,7 +1007,8 @@ export async function getDashboardSummary(schoolId?: string): Promise<DashboardS
     activeTrips,
     delayedTrips,
     unresolvedAlerts,
-    onboardStudents
+    onboardStudents,
+    assignedStudents
   };
 }
 
@@ -1145,11 +1197,32 @@ export async function listAdminResources(
 }
 
 export async function createAdminResource(resource: AdminResource, schoolId: string | undefined, payload: Record<string, unknown>) {
-  const basePayload = {
-    ...sanitizeAdminResourcePayload(resource, payload, schoolId),
+  const sanitized = sanitizeAdminResourcePayload(resource, payload, schoolId);
+  const basePayload: Record<string, unknown> = {
+    ...sanitized,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   };
+
+  // Special handling for users: Create Auth account if email/password provided
+  if (resource === "users" && typeof payload.email === "string" && typeof payload.password === "string") {
+    const adminClient = getSupabaseAdminClient();
+    const { data: authUser, error: authError } = await adminClient.auth.admin.createUser({
+      email: payload.email,
+      password: payload.password,
+      email_confirm: true,
+      user_metadata: {
+        full_name: sanitized.full_name,
+        role: sanitized.role
+      }
+    });
+
+    if (authError) {
+      throw new HttpError(400, authError.message, "auth_user_create_failed");
+    }
+
+    basePayload.auth_user_id = authUser.user.id;
+  }
 
   const { data, error } = await getSupabaseAdminClient()
     .from(getAdminTable(resource))
@@ -1170,10 +1243,36 @@ export async function updateAdminResource(
   schoolId: string | undefined,
   payload: Record<string, unknown>
 ) {
-  const basePayload = {
-    ...sanitizeAdminResourcePayload(resource, payload, schoolId),
+  const sanitized = sanitizeAdminResourcePayload(resource, payload, schoolId);
+  const basePayload: Record<string, unknown> = {
+    ...sanitized,
     updated_at: new Date().toISOString()
   };
+
+  // Special handling for user passwords
+  if (resource === "users" && typeof payload.password === "string" && payload.password.trim().length > 0) {
+    const adminClient = getSupabaseAdminClient();
+    const { data: existingUser, error: lookupError } = await adminClient
+      .from("users")
+      .select("auth_user_id")
+      .eq("id", resourceId)
+      .maybeSingle();
+
+    if (lookupError) {
+      throw new HttpError(500, lookupError.message, "user_lookup_failed");
+    }
+
+    const authUserId = existingUser?.auth_user_id;
+    if (typeof authUserId === "string" && authUserId) {
+      const { error: authError } = await adminClient.auth.admin.updateUserById(authUserId, {
+        password: payload.password
+      });
+
+      if (authError) {
+        throw new HttpError(400, authError.message, "auth_password_update_failed");
+      }
+    }
+  }
 
   let query = getSupabaseAdminClient()
     .from(getAdminTable(resource))

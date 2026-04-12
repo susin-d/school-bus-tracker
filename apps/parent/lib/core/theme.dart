@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'colors.dart';
 
-ThemeData buildSchoolBusLightTheme() {
+ThemeData buildSurakshaLightTheme() {
   final colorScheme = ColorScheme.fromSeed(
     seedColor: AppColors.orange,
     brightness: Brightness.light,
@@ -116,7 +116,7 @@ ThemeData buildSchoolBusLightTheme() {
   );
 }
 
-ThemeData buildSchoolBusDarkTheme() {
+ThemeData buildSurakshaDarkTheme() {
   final colorScheme = ColorScheme.fromSeed(
     seedColor: AppColors.orange,
     brightness: Brightness.dark,

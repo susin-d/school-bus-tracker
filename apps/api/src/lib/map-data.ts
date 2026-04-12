@@ -12,12 +12,12 @@ import type {
 
 import { HttpError } from "./http.js";
 import {
+  type LatLng,
   addSeconds,
-  estimateTravelSeconds,
+  estimateTravelDurationsBatch,
   geocodeAddress,
   isValidLatLng,
-  optimizeWaypointOrder,
-  type LatLng
+  optimizeWaypointOrder
 } from "./maps.js";
 import { publishRealtimeEvent } from "./realtime.js";
 import {
@@ -280,47 +280,39 @@ async function listTripStops(tripId: string): Promise<InternalTripStop[]> {
 }
 
 async function writeTripStops(stops: InternalTripStop[]) {
+  if (stops.length === 0) return;
   const now = new Date().toISOString();
   const client = getSupabaseAdminClient();
 
-  for (const stop of stops) {
-    const payload = {
-      school_id: stop.schoolId,
-      trip_id: stop.tripId,
-      student_id: stop.studentId ?? null,
-      stop_id: stop.stopId ?? null,
-      student_name: stop.studentName ?? null,
-      address_text: stop.addressText ?? null,
-      latitude: stop.latitude,
-      longitude: stop.longitude,
-      sequence: stop.sequence,
-      planned_eta: stop.plannedEta ?? null,
-      current_eta: stop.currentEta ?? null,
-      stop_status: stop.stopStatus,
-      skip_reason: stop.skipReason ?? null,
-      actual_arrived_at: stop.actualArrivedAt ?? null,
-      actual_boarded_at: stop.actualBoardedAt ?? null,
-      actual_dropped_at: stop.actualDroppedAt ?? null,
-      no_show_at: stop.noShowAt ?? null,
-      updated_at: now
-    };
+  const payloads = stops.map(stop => ({
+    id: stop.id || undefined, // undefined lets Supabase generate UUID if missing
+    school_id: stop.schoolId,
+    trip_id: stop.tripId,
+    student_id: stop.studentId ?? null,
+    stop_id: stop.stopId ?? null,
+    student_name: stop.studentName ?? null,
+    address_text: stop.addressText ?? null,
+    latitude: stop.latitude,
+    longitude: stop.longitude,
+    sequence: stop.sequence,
+    planned_eta: stop.plannedEta ?? null,
+    current_eta: stop.currentEta ?? null,
+    stop_status: stop.stopStatus,
+    skip_reason: stop.skipReason ?? null,
+    actual_arrived_at: stop.actualArrivedAt ?? null,
+    actual_boarded_at: stop.actualBoardedAt ?? null,
+    actual_dropped_at: stop.actualDroppedAt ?? null,
+    no_show_at: stop.noShowAt ?? null,
+    updated_at: now,
+    created_at: stop.id ? undefined : now // only set created_at for new stops
+  }));
 
-    if (stop.id) {
-      const { error } = await client.from("trip_stops").update(payload).eq("id", stop.id);
-      if (error) {
-        throw new HttpError(500, error.message, "trip_stop_update_failed");
-      }
-      continue;
-    }
+  const { error } = await client
+    .from("trip_stops")
+    .upsert(payloads, { onConflict: "id" });
 
-    const { error } = await client.from("trip_stops").insert({
-      ...payload,
-      created_at: now
-    });
-
-    if (error) {
-      throw new HttpError(500, error.message, "trip_stop_insert_failed");
-    }
+  if (error) {
+    throw new HttpError(500, error.message, "trip_stops_bulk_upsert_failed");
   }
 }
 
@@ -443,21 +435,27 @@ async function recalculateStopEtas(input: {
   baseIso: string;
   stops: InternalTripStop[];
 }) {
-  let cursor = input.origin;
-  let etaCursor = input.baseIso;
+  if (input.stops.length === 0) return;
 
+  const segments: { origin: LatLng; destination: LatLng }[] = [];
+  let cursor = input.origin;
   for (const stop of input.stops) {
-    const travelSeconds = await estimateTravelSeconds(cursor, stop, etaCursor);
+    segments.push({ origin: cursor, destination: stop });
+    cursor = { latitude: stop.latitude, longitude: stop.longitude };
+  }
+
+  const durations = await estimateTravelDurationsBatch(segments, input.baseIso);
+  
+  let etaCursor = input.baseIso;
+  for (let i = 0; i < input.stops.length; i++) {
+    const stop = input.stops[i];
+    const travelSeconds = durations[i] ?? 0;
     const eta = addSeconds(etaCursor, travelSeconds + 30);
     stop.currentEta = eta;
     if (!stop.plannedEta) {
       stop.plannedEta = eta;
     }
     etaCursor = eta;
-    cursor = {
-      latitude: stop.latitude,
-      longitude: stop.longitude
-    };
   }
 }
 

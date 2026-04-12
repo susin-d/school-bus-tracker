@@ -169,19 +169,39 @@ export async function estimateTravelSeconds(
   destination: LatLng,
   departureAtIso: string
 ) {
-  if (!isValidLatLng(origin) || !isValidLatLng(destination)) {
-    return fallbackTravelSeconds(origin, destination);
+  const results = await estimateTravelDurationsBatch([{ origin, destination }], departureAtIso);
+  return results[0] ?? fallbackTravelSeconds(origin, destination);
+}
+
+export async function estimateTravelDurationsBatch(
+  segments: { origin: LatLng; destination: LatLng }[],
+  departureAtIso: string
+): Promise<number[]> {
+  if (segments.length === 0) return [];
+  
+  // If only 1 segment and coordinates are invalid, use fallback immediately
+  if (segments.length === 1 && (!isValidLatLng(segments[0].origin) || !isValidLatLng(segments[0].destination))) {
+    return [fallbackTravelSeconds(segments[0].origin, segments[0].destination)];
   }
 
   const apiKey = readGoogleApiKey();
   if (!apiKey) {
     markGoogleDependency("error", "GOOGLE_MAPS_API_KEY is not configured");
-    return fallbackTravelSeconds(origin, destination);
+    return segments.map(s => fallbackTravelSeconds(s.origin, s.destination));
   }
 
+  // Google Distance Matrix limits: 25 origins/destinations and 100 elements total.
+  // We'll process in chunks if needed, but for school bus routes (~20-30 stops), one call is usually enough.
   const endpoint = new URL("https://maps.googleapis.com/maps/api/distancematrix/json");
-  endpoint.searchParams.set("origins", `${origin.latitude},${origin.longitude}`);
-  endpoint.searchParams.set("destinations", `${destination.latitude},${destination.longitude}`);
+  
+  // To get sequential segments (O->A, A->B, B->C) in ONE call:
+  // we pass all origins and all destinations and pick the diagonal.
+  const uniqueOrigins = segments.map(s => s.origin);
+  const uniqueDestinations = segments.map(s => s.destination);
+
+  endpoint.searchParams.set("origins", uniqueOrigins.map(o => `${o.latitude},${o.longitude}`).join("|"));
+  endpoint.searchParams.set("destinations", uniqueDestinations.map(d => `${d.latitude},${d.longitude}`).join("|"));
+  
   const departureTimestampMs = Date.parse(departureAtIso);
   const departureParam =
     Number.isFinite(departureTimestampMs) && departureTimestampMs > Date.now()
@@ -195,7 +215,7 @@ export async function estimateTravelSeconds(
     const response = await fetch(endpoint);
     if (!response.ok) {
       markGoogleDependency("error", `distancematrix_http_${response.status}`);
-      return fallbackTravelSeconds(origin, destination);
+      return segments.map(s => fallbackTravelSeconds(s.origin, s.destination));
     }
 
     const payload = (await response.json()) as {
@@ -209,24 +229,32 @@ export async function estimateTravelSeconds(
       }>;
     };
 
-    const element = payload.rows?.[0]?.elements?.[0];
-    const trafficSeconds = element?.duration_in_traffic?.value;
-    const durationSeconds = element?.duration?.value;
-    if (typeof trafficSeconds === "number" && Number.isFinite(trafficSeconds)) {
-      markGoogleDependency("ok");
-      return trafficSeconds;
+    if (payload.status !== "OK" || !payload.rows) {
+      markGoogleDependency("error", `distancematrix_status_${payload.status}`);
+      return segments.map(s => fallbackTravelSeconds(s.origin, s.destination));
     }
 
-    if (typeof durationSeconds === "number" && Number.isFinite(durationSeconds)) {
-      markGoogleDependency("ok");
-      return durationSeconds;
+    const results: number[] = [];
+    for (let i = 0; i < segments.length; i++) {
+      // For sequential segments, we look at the i-th origin and i-th destination
+      const element = payload.rows[i]?.elements?.[i];
+      const trafficSeconds = element?.duration_in_traffic?.value;
+      const durationSeconds = element?.duration?.value;
+      
+      if (typeof trafficSeconds === "number" && Number.isFinite(trafficSeconds)) {
+        results.push(trafficSeconds);
+      } else if (typeof durationSeconds === "number" && Number.isFinite(durationSeconds)) {
+        results.push(durationSeconds);
+      } else {
+        results.push(fallbackTravelSeconds(segments[i].origin, segments[i].destination));
+      }
     }
 
-    markGoogleDependency("error", "distancematrix_missing_duration");
-    return fallbackTravelSeconds(origin, destination);
+    markGoogleDependency("ok");
+    return results;
   } catch {
     markGoogleDependency("error", "distancematrix_network_error");
-    return fallbackTravelSeconds(origin, destination);
+    return segments.map(s => fallbackTravelSeconds(s.origin, s.destination));
   }
 }
 

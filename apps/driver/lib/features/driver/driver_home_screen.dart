@@ -8,6 +8,7 @@ import 'driver_api.dart';
 import 'active_trip_screen.dart';
 import 'announcement_screen.dart';
 import 'student_list_screen.dart';
+import '../../widgets/app_drawer.dart';
 
 class DriverHomeScreen extends StatefulWidget {
   const DriverHomeScreen({super.key});
@@ -82,13 +83,39 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     final trip = AppScope.of(context).currentTrip;
 
     return Scaffold(
-      backgroundColor: isDark ? AppDarkColors.scaffoldBackground : const Color(0xFFF8F9FA),
+      backgroundColor: isDark ? AppDarkColors.scaffoldBackground : const Color(0xFFFBFBFB),
+      drawer: const AppDrawer(),
+      appBar: AppBar(
+        centerTitle: false,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: AppColors.surakshaOrangeGradient,
+            borderRadius: BorderRadius.only(
+              bottomLeft: Radius.circular(24),
+              bottomRight: Radius.circular(24),
+            ),
+          ),
+        ),
+        title: const Text(
+          'Suraksha Driver',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        actions: [
+          IconButton(
+            onPressed: _checkForTrip,
+            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: _checkForTrip,
               child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
                 children: [
                   // Profile Card
                   _DriverProfileCard(user: user, trip: trip, isDark: isDark),
@@ -113,7 +140,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                         title: 'Start Trip',
                         subtitle: 'Begin route',
                         icon: Icons.navigation_rounded,
-                        color: Colors.amber,
+                        color: AppColors.orange,
                         isDark: isDark,
                         onTap: () => Navigator.push(
                           context,
@@ -135,7 +162,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                         title: 'Students',
                         subtitle: '${trip?.studentCount ?? 4} assigned',
                         icon: Icons.people_alt_rounded,
-                        color: Colors.blueGrey,
+                        color: Colors.indigoAccent,
                         isDark: isDark,
                         onTap: () => Navigator.push(
                           context,
@@ -146,7 +173,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                         title: 'Bus Info',
                         subtitle: trip?.plateNumber ?? 'TN 09 AB 1234',
                         icon: Icons.directions_bus_rounded,
-                        color: Colors.grey,
+                        color: Colors.teal,
                         isDark: isDark,
                         onTap: () {
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -156,15 +183,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                       ),
                     ],
                   ),
-
-                  const SizedBox(height: 40),
                   
-                  // Logout Button
-                  TextButton.icon(
-                    onPressed: () => AppScope.of(context).signOut(),
-                    icon: const Icon(Icons.logout_rounded, color: Colors.blueGrey),
-                    label: const Text('Sign Out', style: TextStyle(color: Colors.blueGrey)),
-                  ),
+                  const SizedBox(height: 24),
                 ],
               ),
             ),

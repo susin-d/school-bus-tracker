@@ -22,11 +22,12 @@ export function UsersPage() {
       }}
       fields={[
         { key: "full_name", label: "Full Name", placeholder: "Full name", required: true },
+        { key: "email", label: "Email", placeholder: "name@school.com", required: true },
+        { key: "password", label: "Password", placeholder: "Min 6 characters" },
         { key: "role", label: "Role", placeholder: "parent | driver | admin | super_admin", required: true },
         { key: "is_active", label: "Is Active", placeholder: "true" },
         { key: "school_id", label: "School ID", placeholder: "School ID" },
-        { key: "phone_number", label: "Phone", placeholder: "+91..." },
-        { key: "email", label: "Email", placeholder: "name@school.com" }
+        { key: "phone_number", label: "Phone", placeholder: "+91..." }
       ]}
     />
   );

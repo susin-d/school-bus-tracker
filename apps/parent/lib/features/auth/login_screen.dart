@@ -170,7 +170,7 @@ class _LoginScreenState extends State<LoginScreen>
           children: [
             Center(
               child: Semantics(
-                label: 'School bus logo',
+                label: 'SURAKSHA logo',
                 child: Container(
                   height: 72,
                   width: 72,

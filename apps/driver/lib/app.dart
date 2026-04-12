@@ -5,14 +5,14 @@ import 'core/app_state.dart';
 import 'core/theme.dart';
 import 'features/shell/app_router.dart';
 
-class SchoolBusApp extends StatefulWidget {
-  const SchoolBusApp({super.key});
+class SurakshaApp extends StatefulWidget {
+  const SurakshaApp({super.key});
 
   @override
-  State<SchoolBusApp> createState() => _SchoolBusAppState();
+  State<SurakshaApp> createState() => _SurakshaAppState();
 }
 
-class _SchoolBusAppState extends State<SchoolBusApp> {
+class _SurakshaAppState extends State<SurakshaApp> {
   late final AppState _appState;
 
   @override
@@ -33,9 +33,9 @@ class _SchoolBusAppState extends State<SchoolBusApp> {
       appState: _appState,
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
-        title: 'SchoolBus Driver',
-        theme: buildSchoolBusLightTheme(),
-        darkTheme: buildSchoolBusDarkTheme(),
+        title: 'SURAKSHA Driver',
+        theme: buildSurakshaLightTheme(),
+        darkTheme: buildSurakshaDarkTheme(),
         themeMode: ThemeMode.system,
         home: const AppRouter(),
       ),

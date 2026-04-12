@@ -65,7 +65,7 @@ class _PermissionGuardState extends State<PermissionGuard> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'We need your location to show where you are relative to the school bus.',
+              'We need your location to show where you are relative to the SURAKSHA bus.',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.grey),
             ),

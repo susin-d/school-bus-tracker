@@ -34,7 +34,7 @@ tripsRouter.get("/current", asyncHandler(async (request, response) => {
   const result = await getCurrentTripForUser(user);
 
   const payload: CurrentTripResponse = {
-    trip: result.trip,
+    trip: result.trip ? { ...result.trip, studentCount: result.students.length } : null,
     students: result.students,
     lastLocation: result.lastLocation
   };

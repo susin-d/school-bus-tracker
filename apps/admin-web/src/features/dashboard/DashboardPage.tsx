@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { 
   Activity, 
@@ -6,7 +7,8 @@ import {
   AlertTriangle, 
   TrendingUp,
   MapPin,
-  Calendar
+  Calendar,
+  Contact
 } from "lucide-react";
 import {
   AreaChart,
@@ -20,6 +22,8 @@ import {
 
 import { AppShell } from "../../app/AppShell";
 import { useRequiredAdminUser } from "../../core/auth";
+import { getDashboard } from "../../core/api";
+import { DashboardSummary } from "@school-bus/shared";
 
 const SAMPLE_CHART_DATA = [
   { name: "06:00", active: 20 },
@@ -32,11 +36,23 @@ const SAMPLE_CHART_DATA = [
 ];
 
 export function DashboardPage() {
-  useRequiredAdminUser();
-  const unresolvedAlerts = 0;
-  const delayedTrips = 0;
-  const activeTrips = 0;
-  const onboardStudents = 0;
+  const user = useRequiredAdminUser();
+  const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getDashboard(user)
+      .then(setSummary)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [user]);
+
+  const unresolvedAlerts = summary?.unresolvedAlerts ?? 0;
+  const delayedTrips = summary?.delayedTrips ?? 0;
+  const activeTrips = summary?.activeTrips ?? 0;
+  const onboardStudents = summary?.onboardStudents ?? 0;
+  const assignedStudents = summary?.assignedStudents ?? 0;
+
   const onTimeRate =
     activeTrips > 0
       ? Math.max(0, Math.min(100, Math.round(((activeTrips - delayedTrips) / activeTrips) * 100)))
@@ -49,26 +65,32 @@ export function DashboardPage() {
       <section className="dashboard-kpi-grid">
         <MetricCard 
           label="Active Trips" 
-          value={String(activeTrips)} 
+          value={loading ? "..." : String(activeTrips)} 
           icon={Activity}
           description="In-progress routes"
         />
         <MetricCard 
           label="Delayed Trips" 
-          value={String(delayedTrips)} 
+          value={loading ? "..." : String(delayedTrips)} 
           tone="warm" 
           icon={Clock}
           description="Needs attention"
         />
         <MetricCard 
           label="Students Onboard" 
-          value={String(onboardStudents)} 
+          value={loading ? "..." : String(onboardStudents)} 
           icon={Users}
-          description="Total tracked"
+          description="Live tracking"
+        />
+        <MetricCard 
+          label="Assigned Students" 
+          value={loading ? "..." : String(assignedStudents)} 
+          icon={Contact}
+          description="Total enrolled"
         />
         <MetricCard 
           label="Open Alerts" 
-          value={String(unresolvedAlerts)} 
+          value={loading ? "..." : String(unresolvedAlerts)} 
           tone={unresolvedAlerts > 0 ? "warm" : "default"} 
           icon={AlertTriangle}
           description="Awaiting resolution"

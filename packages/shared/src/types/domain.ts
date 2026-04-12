@@ -71,6 +71,7 @@ export interface TripSummary {
   driverLicenseNo?: string;
   busCapacity?: number;
   busPlate?: string;
+  studentCount?: number;
 }
 
 export interface TripLocation {

@@ -308,7 +308,7 @@ export function ResourceCrudPage({
                 <thead>
                   <tr>
                     <th>ID</th>
-                    {fields.map((field) => (
+                    {fields.filter(f => f.key !== "password").map((field) => (
                       <th key={field.key}>{field.label}</th>
                     ))}
                     <th>Actions</th>
@@ -320,7 +320,7 @@ export function ResourceCrudPage({
                     return (
                       <tr key={resourceId || JSON.stringify(item)}>
                         <td>{resourceId || "n/a"}</td>
-                        {fields.map((field) => (
+                        {fields.filter(f => f.key !== "password").map((field) => (
                           <td key={field.key}>{String(item[field.key] ?? "n/a")}</td>
                         ))}
                         <td>
@@ -393,6 +393,7 @@ export function ResourceCrudPage({
                   ) : (
                     <input
                       key={field.key}
+                      type={field.key === "password" ? "password" : "text"}
                       className={editFieldErrors[field.key] ? "resource-input resource-input-error" : "resource-input"}
                       onChange={(event) => setEditField(field.key, event.target.value)}
                       placeholder={`${field.label}${field.required ? " *" : ""}`}
@@ -455,6 +456,7 @@ export function ResourceCrudPage({
                   ) : (
                     <input
                       key={field.key}
+                      type={field.key === "password" ? "password" : "text"}
                       className={createFieldErrors[field.key] ? "resource-input resource-input-error" : "resource-input"}
                       onChange={(event) => setCreateField(field.key, event.target.value)}
                       placeholder={`${field.label}${field.required ? " *" : ""}`}

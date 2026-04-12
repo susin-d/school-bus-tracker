@@ -3,4 +3,5 @@ export interface DashboardSummary {
   delayedTrips: number;
   onboardStudents: number;
   unresolvedAlerts: number;
+  assignedStudents: number;
 }

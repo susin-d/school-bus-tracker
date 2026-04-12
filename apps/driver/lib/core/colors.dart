@@ -5,6 +5,19 @@ class AppColors {
   static const orange = Color(0xFFF57C00);
   static const orangeStrong = Color(0xFFE65100);
   static const brown = Color(0xFF3F2413);
+
+  // New Brand Gradients
+  static const LinearGradient surakshaOrangeGradient = LinearGradient(
+    colors: [Color(0xFFF57C00), Color(0xFFE65100)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static const softOrangeGradient = LinearGradient(
+    colors: [Color(0xFFFFF3E0), Color(0xFFFFE0B2)],
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+  );
 }
 
 class AppLightColors {

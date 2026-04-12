@@ -26,8 +26,11 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
   BitmapDescriptor? _busIcon;
   BitmapDescriptor? _stopIcon;
   BitmapDescriptor? _schoolIcon;
+  Set<Polyline> _polylines = {};
 
-  // Geofencing state
+  // Optimization state
+  Position? _lastMapUpdatePosition;
+  double _lastMapUpdateHeading = 0.0;
   bool _showingArrivalDialog = false;
 
   @override
@@ -81,6 +84,7 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
       setState(() {
         _stops = list;
       });
+      _updateRoutePolylines();
     } catch (e) {
       // Manifest loading failed, silenty fail as manifest might not be ready
     }
@@ -95,9 +99,33 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
     _positionStream = Geolocator.getPositionStream(locationSettings: locationSettings).listen(
       (Position position) {
         if (!mounted) return;
+
+        bool shouldUpdateMap = false;
+        if (_lastMapUpdatePosition == null) {
+          shouldUpdateMap = true;
+        } else {
+          final distance = Geolocator.distanceBetween(
+            _lastMapUpdatePosition!.latitude,
+            _lastMapUpdatePosition!.longitude,
+            position.latitude,
+            position.longitude,
+          );
+          final headingDelta = (position.heading - _lastMapUpdateHeading).abs();
+          // Threshold: 10 meters OR 15 degrees change
+          if (distance > 10 || headingDelta > 15) {
+            shouldUpdateMap = true;
+          }
+        }
+
         setState(() {
-           _currentPosition = position;
+          _currentPosition = position;
+          if (shouldUpdateMap) {
+            _lastMapUpdatePosition = position;
+            _lastMapUpdateHeading = position.heading;
+            _polylines = _calculatePolylines(position);
+          }
         });
+
         _checkGeofences(position);
         _updateBackendLocation(position);
       },
@@ -131,14 +159,14 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
     final nextStop = _getNextStop();
     if (nextStop == null) return;
 
-    final stopLat = (nextStop['latitude'] as num).toDouble();
-    final stopLng = (nextStop['longitude'] as num).toDouble();
+    final stopLat = (nextStop['latitude'] ?? nextStop['lat'] ?? 0.0) as num;
+    final stopLng = (nextStop['longitude'] ?? nextStop['lng'] ?? 0.0) as num;
 
     final distance = Geolocator.distanceBetween(
       pos.latitude,
       pos.longitude,
-      stopLat,
-      stopLng,
+      stopLat.toDouble(),
+      stopLng.toDouble(),
     );
 
     // If within 100m (user asked for 50m, but 100m is safer for GPS drift)
@@ -153,6 +181,60 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
         final status = s['stopStatus']?.toString() ?? 'scheduled';
         return status != 'boarded' && status != 'no_show' && status != 'skipped' && status != 'dropped';
       });
+    } catch (_) {
+      return null;
+    }
+  }
+  
+  Set<Polyline> _calculatePolylines(Position currentPos) {
+    final List<LatLng> points = [];
+
+    // Start from current bus position
+    points.add(LatLng(currentPos.latitude, currentPos.longitude));
+
+    // Add all upcoming stops in order
+    for (final stop in _stops) {
+      final status = stop['stopStatus']?.toString() ?? 'scheduled';
+      final isCompleted = status == 'boarded' || status == 'no_show' || status == 'skipped' || status == 'dropped';
+      
+      if (!isCompleted) {
+        final pos = _parseLatLng(stop);
+        if (pos != null) {
+          points.add(pos);
+        }
+      }
+    }
+
+    return {
+      if (points.length > 1)
+        Polyline(
+          polylineId: const PolylineId('route_path'),
+          points: points,
+          color: Colors.indigoAccent,
+          width: 6,
+          jointType: JointType.round,
+          endCap: Cap.roundCap,
+          startCap: Cap.roundCap,
+        ),
+    };
+  }
+
+  void _updateRoutePolylines() {
+    if (_currentPosition == null) return;
+    final newPolylines = _calculatePolylines(_currentPosition!);
+    if (mounted) {
+      setState(() {
+        _polylines = newPolylines;
+      });
+    }
+  }
+
+  LatLng? _parseLatLng(Map<String, dynamic> stop) {
+    try {
+      final lat = stop['latitude'] ?? stop['lat'];
+      final lng = stop['longitude'] ?? stop['lng'];
+      if (lat == null || lng == null) return null;
+      return LatLng((lat as num).toDouble(), (lng as num).toDouble());
     } catch (_) {
       return null;
     }
@@ -204,12 +286,13 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
   Widget build(BuildContext context) {
     final trip = AppScope.of(context).currentTrip;
     final nextStop = _getNextStop();
-    final distanceToNext = (nextStop != null && _currentPosition != null)
+    final nextStopPos = nextStop != null ? _parseLatLng(nextStop) : null;
+    final distanceToNext = (nextStopPos != null && _currentPosition != null)
         ? _calculateDistance(
             _currentPosition!.latitude,
             _currentPosition!.longitude,
-            (nextStop['latitude'] as num).toDouble(),
-            (nextStop['longitude'] as num).toDouble(),
+            nextStopPos.latitude,
+            nextStopPos.longitude,
           )
         : null;
 
@@ -231,13 +314,18 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
                   position: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
                   icon: _busIcon ?? BitmapDescriptor.defaultMarker,
                 ),
-              ..._stops.map((s) => Marker(
-                markerId: MarkerId(s['id'].toString()),
-                position: LatLng((s['latitude'] as num).toDouble(), (s['longitude'] as num).toDouble()),
-                icon: (s['studentId'] == null) ? (_schoolIcon ?? BitmapDescriptor.defaultMarker) : (_stopIcon ?? BitmapDescriptor.defaultMarker),
-                alpha: (s['stopStatus'] == 'boarded' || s['stopStatus'] == 'no_show') ? 0.3 : 1.0,
-              )),
+              ..._stops.map((s) {
+                final pos = _parseLatLng(s);
+                if (pos == null) return const Marker(markerId: MarkerId('null'));
+                return Marker(
+                  markerId: MarkerId(s['id'].toString()),
+                  position: pos,
+                  icon: (s['studentId'] == null) ? (_schoolIcon ?? BitmapDescriptor.defaultMarker) : (_stopIcon ?? BitmapDescriptor.defaultMarker),
+                  alpha: (s['stopStatus'] == 'boarded' || s['stopStatus'] == 'no_show') ? 0.3 : 1.0,
+                );
+              }).where((m) => m.markerId.value != 'null'),
             },
+            polylines: _polylines,
           ),
 
           // Top Info Panel

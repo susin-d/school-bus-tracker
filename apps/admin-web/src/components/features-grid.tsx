@@ -45,7 +45,7 @@ export default function FeaturesGrid() {
             Powerful features for modern transportation
           </h2>
           <p className="text-lg text-foreground/60 max-w-2xl mx-auto">
-            Everything you need to manage school buses, coordinate routes, and keep parents informed—all in one platform.
+            Everything you need to manage SURAKSHA buses, coordinate routes, and keep parents informed—all in one platform.
           </p>
         </div>
 
