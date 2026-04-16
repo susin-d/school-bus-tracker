@@ -57,7 +57,14 @@ function asString(value: unknown, fallback = "") {
 }
 
 function asNumber(value: unknown) {
-  return typeof value === "number" ? value : undefined;
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value.trim());
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
 }
 
 function asIso(value: unknown) {
@@ -99,6 +106,38 @@ function requireRoleForSchoolMutation(user: UserProfile, schoolId: string) {
 
 function isCompletedStatus(status: TripStopManifestItem["stopStatus"]) {
   return status === "boarded" || status === "dropped" || status === "no_show" || status === "skipped";
+}
+
+function buildLiveRoutePoints(input: {
+  tripStatus: LiveDriverMapItem["status"];
+  latitude?: number;
+  longitude?: number;
+  stops: InternalTripStop[];
+}) {
+  const routePoints: Array<{ latitude: number; longitude: number }> = [];
+
+  if (
+    input.latitude != null &&
+    input.longitude != null &&
+    (input.tripStatus === "active" || input.tripStatus === "paused")
+  ) {
+    routePoints.push({
+      latitude: input.latitude,
+      longitude: input.longitude
+    });
+  }
+
+  for (const stop of input.stops) {
+    if (isCompletedStatus(stop.stopStatus) || !isValidLatLng(stop)) {
+      continue;
+    }
+    routePoints.push({
+      latitude: stop.latitude,
+      longitude: stop.longitude
+    });
+  }
+
+  return routePoints.length >= 2 ? routePoints : undefined;
 }
 
 async function selectSchoolMapSettings(schoolId: string): Promise<SchoolMapSettings> {
@@ -693,13 +732,17 @@ export async function geocodeStudentAddress(input: {
   const schoolId = asString(studentRow.school_id);
   requireRoleForSchoolMutation(input.actor, schoolId);
 
-  const addressText = input.addressText?.trim() || asString(studentRow.address_text).trim();
+  const addressText =
+    input.addressText?.trim() ||
+    asString(studentRow.address_text).trim() ||
+    asString(studentRow.home_address).trim();
   if (!addressText) {
     throw new HttpError(400, "Student address is required for geocoding", "missing_student_address");
   }
 
   const geocode = await geocodeAddress(addressText);
   const patch: Record<string, unknown> = {
+    home_address: addressText,
     address_text: addressText,
     geocode_status: geocode.geocodeStatus,
     place_id: geocode.placeId ?? null,
@@ -741,7 +784,7 @@ export async function bulkGeocodeStudents(input: {
     .from("students")
     .select("*")
     .eq("school_id", input.schoolId)
-    .not("address_text", "is", null)
+    .or("address_text.not.is.null,home_address.not.is.null")
     .order("created_at", { ascending: false });
 
   if (!input.forceRefresh) {
@@ -1164,6 +1207,12 @@ export async function listLiveDrivers(input: {
       nextStopEta: nextStop?.currentEta ?? nextStop?.plannedEta,
       etaDelayMinutes,
       isDelayed: etaDelayMinutes >= 5,
+      routePoints: buildLiveRoutePoints({
+        tripStatus,
+        latitude,
+        longitude,
+        stops
+      }),
       clusterKey:
         input.actor.role === "super_admin" && input.clusterMode === "grid" && latitude != null && longitude != null
           ? `${Math.round(latitude * 20) / 20},${Math.round(longitude * 20) / 20}`

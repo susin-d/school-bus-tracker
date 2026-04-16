@@ -3,11 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api_client.dart';
 import '../../core/app_scope.dart';
 import '../../core/app_state.dart';
 import '../../core/colors.dart';
+import '../../core/traffic_service.dart';
 import 'driver_api.dart';
 import '../../core/marker_generator.dart';
 import '../../core/widgets/permission_guard.dart';
@@ -20,6 +22,7 @@ class ActiveTripScreen extends StatefulWidget {
 }
 
 class _ActiveTripScreenState extends State<ActiveTripScreen> {
+  final TrafficService _trafficService = TrafficService();
   StreamSubscription<Position>? _positionStream;
   Position? _currentPosition;
   GoogleMapController? _mapController;
@@ -33,6 +36,16 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
   Position? _lastMapUpdatePosition;
   double _lastMapUpdateHeading = 0.0;
   bool _showingArrivalDialog = false;
+  TrafficEstimate? _trafficEstimate;
+  bool _trafficLoading = false;
+  DateTime? _lastTrafficUpdateAt;
+  String? _lastTrafficTargetKey;
+
+  double? _asDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value.trim());
+    return null;
+  }
 
   @override
   void initState() {
@@ -86,6 +99,7 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
         _stops = list;
       });
       _updateRoutePolylines();
+      unawaited(_refreshTrafficEstimate(force: true));
     } catch (e) {
       // Manifest loading failed, silenty fail as manifest might not be ready
     }
@@ -97,7 +111,8 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
       distanceFilter: 5,
     );
 
-    _positionStream = Geolocator.getPositionStream(locationSettings: locationSettings).listen(
+    _positionStream =
+        Geolocator.getPositionStream(locationSettings: locationSettings).listen(
       (Position position) {
         if (!mounted) return;
 
@@ -123,8 +138,11 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
           if (shouldUpdateMap) {
             _lastMapUpdatePosition = position;
             _lastMapUpdateHeading = position.heading;
-            _polylines = _calculatePolylines(position);
-            
+            _polylines = _calculatePolylines(
+              LatLng(position.latitude, position.longitude),
+              targetStop: _resolveTargetStop(position),
+            );
+
             // Auto-follow logic
             _mapController?.animateCamera(
               CameraUpdate.newCameraPosition(
@@ -141,6 +159,7 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
 
         _checkGeofences(position);
         _updateBackendLocation(position);
+        unawaited(_refreshTrafficEstimate());
       },
       onError: (error) {
         if (!mounted) return;
@@ -171,17 +190,18 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
     final trip = AppScope.of(context).currentTrip;
     if (trip?.status != 'active') return;
 
-    final nextStop = _getNextStop();
+    final nextStop = _getNearestPendingStudentStop(pos);
     if (nextStop == null) return;
 
-    final stopLat = (nextStop['latitude'] ?? nextStop['lat'] ?? 0.0) as num;
-    final stopLng = (nextStop['longitude'] ?? nextStop['lng'] ?? 0.0) as num;
+    final stopLng = _asDouble(nextStop['longitude'] ?? nextStop['lng']);
+    final stopLatitude = _asDouble(nextStop['latitude'] ?? nextStop['lat']);
+    if (stopLatitude == null || stopLng == null) return;
 
     final distance = Geolocator.distanceBetween(
       pos.latitude,
       pos.longitude,
-      stopLat.toDouble(),
-      stopLng.toDouble(),
+      stopLatitude,
+      stopLng,
     );
 
     // If within 100m (user asked for 50m, but 100m is safer for GPS drift)
@@ -190,35 +210,118 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
     }
   }
 
+  bool _isStopCompleted(Map<String, dynamic> stop) {
+    final status = stop['stopStatus']?.toString() ?? 'scheduled';
+    return status == 'boarded' ||
+        status == 'no_show' ||
+        status == 'skipped' ||
+        status == 'dropped';
+  }
+
   Map<String, dynamic>? _getNextStop() {
     try {
       return _stops.firstWhere((s) {
-        final status = s['stopStatus']?.toString() ?? 'scheduled';
-        return status != 'boarded' && status != 'no_show' && status != 'skipped' && status != 'dropped';
+        if (s['studentId'] == null) return false;
+        return !_isStopCompleted(s);
       });
     } catch (_) {
       return null;
     }
   }
-  
-  Set<Polyline> _calculatePolylines(Position currentPos) {
-    final List<LatLng> points = [];
 
-    // Start from current bus position
-    points.add(LatLng(currentPos.latitude, currentPos.longitude));
+  Map<String, dynamic>? _getSchoolStop() {
+    try {
+      return _stops.firstWhere((s) => s['studentId'] == null);
+    } catch (_) {
+      return null;
+    }
+  }
 
-    // Add all upcoming stops in order
+  Map<String, dynamic>? _getNearestPendingStudentStop(Position position) {
+    double? nearestDistance;
+    Map<String, dynamic>? nearestStop;
+
     for (final stop in _stops) {
-      final status = stop['stopStatus']?.toString() ?? 'scheduled';
-      final isCompleted = status == 'boarded' || status == 'no_show' || status == 'skipped' || status == 'dropped';
-      
-      if (!isCompleted) {
-        final pos = _parseLatLng(stop);
-        if (pos != null) {
-          points.add(pos);
-        }
+      if (stop['studentId'] == null || _isStopCompleted(stop)) continue;
+      final point = _parseLatLng(stop);
+      if (point == null) continue;
+      final distance = Geolocator.distanceBetween(
+        position.latitude,
+        position.longitude,
+        point.latitude,
+        point.longitude,
+      );
+
+      if (nearestDistance == null || distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestStop = stop;
       }
     }
+
+    return nearestStop;
+  }
+
+  Map<String, dynamic>? _resolveTargetStop(Position? position) {
+    if (position != null) {
+      final nearestStudent = _getNearestPendingStudentStop(position);
+      if (nearestStudent != null) return nearestStudent;
+    }
+
+    final fallbackStudent = _getNextStop();
+    if (fallbackStudent != null) return fallbackStudent;
+
+    return _getSchoolStop();
+  }
+
+  LatLng? _resolveRouteOrigin() {
+    if (_currentPosition != null) {
+      return LatLng(_currentPosition!.latitude, _currentPosition!.longitude);
+    }
+
+    final trip = AppScope.of(context).currentTrip;
+    final raw = trip?.raw ?? const <String, dynamic>{};
+    final latitude = _asDouble(
+        raw['lastLocationLat'] ?? raw['last_location_lat'] ?? raw['latitude']);
+    final longitude = _asDouble(
+        raw['lastLocationLng'] ?? raw['last_location_lng'] ?? raw['longitude']);
+    if (latitude != null && longitude != null) {
+      return LatLng(latitude, longitude);
+    }
+
+    for (final stop in _stops) {
+      final point = _parseLatLng(stop);
+      if (point != null) {
+        return point;
+      }
+    }
+
+    return null;
+  }
+
+  List<LatLng> _buildRoutePoints(
+    LatLng origin, {
+    Map<String, dynamic>? targetStop,
+  }) {
+    final List<LatLng> points = [];
+
+    // Start from the current or last known bus position when available.
+    points.add(origin);
+
+    if (targetStop != null) {
+      final target = _parseLatLng(targetStop);
+      if (target != null) {
+        points.add(target);
+      }
+    }
+
+    return points;
+  }
+
+  Set<Polyline> _calculatePolylines(
+    LatLng origin, {
+    Map<String, dynamic>? targetStop,
+  }) {
+    final points = _buildRoutePoints(origin, targetStop: targetStop);
 
     return {
       if (points.length > 1)
@@ -234,31 +337,138 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
     };
   }
 
+  Future<void> _focusRoute(List<LatLng> points) async {
+    if (_mapController == null || points.isEmpty || _currentPosition != null) {
+      return;
+    }
+
+    if (points.length == 1) {
+      await _mapController!.animateCamera(
+        CameraUpdate.newLatLngZoom(points.first, 15),
+      );
+      return;
+    }
+
+    double minLat = points.first.latitude;
+    double maxLat = points.first.latitude;
+    double minLng = points.first.longitude;
+    double maxLng = points.first.longitude;
+
+    for (final point in points.skip(1)) {
+      if (point.latitude < minLat) minLat = point.latitude;
+      if (point.latitude > maxLat) maxLat = point.latitude;
+      if (point.longitude < minLng) minLng = point.longitude;
+      if (point.longitude > maxLng) maxLng = point.longitude;
+    }
+
+    if (minLat == maxLat && minLng == maxLng) {
+      await _mapController!.animateCamera(
+        CameraUpdate.newLatLngZoom(points.first, 15),
+      );
+      return;
+    }
+
+    await _mapController!.animateCamera(
+      CameraUpdate.newLatLngBounds(
+        LatLngBounds(
+          southwest: LatLng(minLat, minLng),
+          northeast: LatLng(maxLat, maxLng),
+        ),
+        64,
+      ),
+    );
+  }
+
   void _updateRoutePolylines() {
-    if (_currentPosition == null) return;
-    final newPolylines = _calculatePolylines(_currentPosition!);
+    final origin = _resolveRouteOrigin();
+    if (origin == null) return;
+    final targetStop = _resolveTargetStop(_currentPosition);
+    final routePoints = _buildRoutePoints(origin, targetStop: targetStop);
+    final newPolylines = _calculatePolylines(origin, targetStop: targetStop);
     if (mounted) {
       setState(() {
         _polylines = newPolylines;
       });
     }
+    unawaited(_focusRoute(routePoints));
+  }
+
+  String _targetKey(Map<String, dynamic>? stop) {
+    if (stop == null) return 'none';
+    final id = stop['id']?.toString();
+    return id == null || id.isEmpty ? 'school' : id;
+  }
+
+  Future<void> _refreshTrafficEstimate({bool force = false}) async {
+    final currentPosition = _currentPosition;
+    final targetStop = _resolveTargetStop(currentPosition);
+
+    if (currentPosition == null || targetStop == null) {
+      if (mounted) {
+        setState(() {
+          _trafficEstimate = null;
+          _trafficLoading = false;
+        });
+      }
+      return;
+    }
+
+    final target = _parseLatLng(targetStop);
+    if (target == null) return;
+
+    final now = DateTime.now();
+    final targetKey = _targetKey(targetStop);
+    if (!force &&
+        _lastTrafficUpdateAt != null &&
+        now.difference(_lastTrafficUpdateAt!) < const Duration(seconds: 25) &&
+        targetKey == _lastTrafficTargetKey) {
+      return;
+    }
+
+    if (mounted) {
+      setState(() => _trafficLoading = true);
+    }
+
+    final estimate = await _trafficService.estimateTravel(
+      origin: LatLng(currentPosition.latitude, currentPosition.longitude),
+      destination: target,
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _trafficEstimate = estimate;
+      _trafficLoading = false;
+      _lastTrafficUpdateAt = now;
+      _lastTrafficTargetKey = targetKey;
+    });
+  }
+
+  Future<void> _openTurnByTurnNavigation(Map<String, dynamic> stop) async {
+    final target = _parseLatLng(stop);
+    if (target == null) return;
+
+    final url = Uri.parse(
+      'https://www.google.com/maps/dir/?api=1&destination=${target.latitude},${target.longitude}&travelmode=driving',
+    );
+
+    if (!await launchUrl(url, mode: LaunchMode.externalApplication) && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open navigation app.')),
+      );
+    }
   }
 
   LatLng? _parseLatLng(Map<String, dynamic> stop) {
-    try {
-      final lat = stop['latitude'] ?? stop['lat'];
-      final lng = stop['longitude'] ?? stop['lng'];
-      if (lat == null || lng == null) return null;
-      return LatLng((lat as num).toDouble(), (lng as num).toDouble());
-    } catch (_) {
-      return null;
-    }
+    final lat = _asDouble(stop['latitude'] ?? stop['lat']);
+    final lng = _asDouble(stop['longitude'] ?? stop['lng']);
+    if (lat == null || lng == null) return null;
+    return LatLng(lat, lng);
   }
 
   void _onArrivedAtStop(Map<String, dynamic> stop) {
     if (_showingArrivalDialog) return;
     _showingArrivalDialog = true;
-    
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -269,75 +479,100 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
     ).then((_) => _showingArrivalDialog = false);
   }
 
-  Future<void> _handleStopAction(Map<String, dynamic> stop, String action) async {
+  Future<void> _handleStopAction(
+      Map<String, dynamic> stop, String action) async {
     final trip = AppScope.of(context).currentTrip!;
     final api = _buildApi();
-    
+
     try {
       if (action == 'boarded') {
-        await api.markStopBoarded(tripId: trip.id, stopId: stop['id'].toString());
+        await api.markStopBoarded(
+            tripId: trip.id, stopId: stop['id'].toString());
       } else if (action == 'no_show') {
-         await api.markStopNoShow(tripId: trip.id, stopId: stop['id'].toString());
+        await api.markStopNoShow(
+            tripId: trip.id, stopId: stop['id'].toString());
       } else if (action == 'dropped') {
-        await api.updateStopStatus(stopId: stop['id'].toString(), status: 'dropped', tripId: trip.id);
+        await api.updateStopStatus(
+            stopId: stop['id'].toString(), status: 'dropped', tripId: trip.id);
       }
-      
+
       if (mounted) {
         Navigator.pop(context);
         _loadManifest();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Action failed: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Action failed: $e')));
       }
     }
   }
 
-  double _calculateDistance(double startLat, double startLng, double endLat, double endLng) {
+  double _calculateDistance(
+      double startLat, double startLng, double endLat, double endLng) {
     return Geolocator.distanceBetween(startLat, startLng, endLat, endLng);
   }
 
   @override
   Widget build(BuildContext context) {
     final trip = AppScope.of(context).currentTrip;
-    final nextStop = _getNextStop();
-    final nextStopPos = nextStop != null ? _parseLatLng(nextStop) : null;
-    final distanceToNext = (nextStopPos != null && _currentPosition != null)
+    final nearestStudent = _currentPosition != null
+        ? _getNearestPendingStudentStop(_currentPosition!)
+        : _getNextStop();
+    final schoolStop = _getSchoolStop();
+    final targetStop = nearestStudent ?? schoolStop;
+    final targetPos = targetStop != null ? _parseLatLng(targetStop) : null;
+    final fallbackDistance = (targetPos != null && _currentPosition != null)
         ? _calculateDistance(
             _currentPosition!.latitude,
             _currentPosition!.longitude,
-            nextStopPos.latitude,
-            nextStopPos.longitude,
+            targetPos.latitude,
+            targetPos.longitude,
           )
         : null;
-
-    final isAtSchool = nextStop == null && _stops.isNotEmpty; // Last stop/School reached
+    final distanceToTarget = _trafficEstimate?.distanceMeters.toDouble() ?? fallbackDistance;
+    final isReturningToSchool = nearestStudent == null && schoolStop != null;
+    final hasReachedSchool = isReturningToSchool &&
+        distanceToTarget != null &&
+        distanceToTarget <= 120;
+    final targetMarkerId = targetStop?['id']?.toString();
 
     return PermissionGuard(
-      child: Scaffold(
-        body: Stack(
+        child: Scaffold(
+      body: Stack(
         children: [
           // Google Map
           GoogleMap(
-            initialCameraPosition: const CameraPosition(target: LatLng(13.0827, 80.2707), zoom: 15),
+            initialCameraPosition: const CameraPosition(
+                target: LatLng(13.0827, 80.2707), zoom: 15),
             myLocationEnabled: true,
             myLocationButtonEnabled: false,
             onMapCreated: (controller) => _mapController = controller,
+            trafficEnabled: true,
             markers: {
               if (_currentPosition != null)
                 Marker(
                   markerId: const MarkerId('bus'),
-                  position: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+                  position: LatLng(
+                      _currentPosition!.latitude, _currentPosition!.longitude),
                   icon: _busIcon ?? BitmapDescriptor.defaultMarker,
                 ),
               ..._stops.map((s) {
                 final pos = _parseLatLng(s);
-                if (pos == null) return const Marker(markerId: MarkerId('null'));
+                if (pos == null) {
+                  return const Marker(markerId: MarkerId('null'));
+                }
                 return Marker(
                   markerId: MarkerId(s['id'].toString()),
                   position: pos,
-                  icon: (s['studentId'] == null) ? (_schoolIcon ?? BitmapDescriptor.defaultMarker) : (_stopIcon ?? BitmapDescriptor.defaultMarker),
-                  alpha: (s['stopStatus'] == 'boarded' || s['stopStatus'] == 'no_show') ? 0.3 : 1.0,
+                  icon: (s['studentId'] == null)
+                      ? (_schoolIcon ?? BitmapDescriptor.defaultMarker)
+                      : (_stopIcon ?? BitmapDescriptor.defaultMarker),
+                  zIndexInt: targetMarkerId != null && s['id']?.toString() == targetMarkerId ? 2 : 1,
+                  alpha: (s['stopStatus'] == 'boarded' ||
+                          s['stopStatus'] == 'no_show')
+                      ? 0.3
+                      : 1.0,
                 );
               }).where((m) => m.markerId.value != 'null'),
             },
@@ -350,9 +585,12 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
             left: 20,
             right: 20,
             child: _TopTripPanel(
-              trip: trip, 
-              nextStop: nextStop,
-              distance: distanceToNext,
+              trip: trip,
+              targetStop: targetStop,
+              distance: distanceToTarget,
+              trafficEstimate: _trafficEstimate,
+              trafficLoading: _trafficLoading,
+              returningToSchool: isReturningToSchool,
             ),
           ),
 
@@ -383,7 +621,14 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
                       }
                     },
                   ),
-                if (isAtSchool && trip?.status == 'active')
+                if (isReturningToSchool && trip?.status == 'active' && !hasReachedSchool)
+                  _ReturnToSchoolAction(
+                    schoolStop: schoolStop,
+                    distanceMeters: distanceToTarget,
+                    etaSeconds: _trafficEstimate?.effectiveDurationSeconds,
+                    onNavigate: () => _openTurnByTurnNavigation(schoolStop),
+                  ),
+                if (hasReachedSchool && trip?.status == 'active')
                   _CompleteTripSlider(
                     onComplete: () async {
                       final api = _buildApi();
@@ -416,10 +661,56 @@ class _ActiveTripScreenState extends State<ActiveTripScreen> {
 }
 
 class _TopTripPanel extends StatelessWidget {
-  const _TopTripPanel({required this.trip, this.nextStop, this.distance});
+  const _TopTripPanel({
+    required this.trip,
+    this.targetStop,
+    this.distance,
+    this.trafficEstimate,
+    required this.trafficLoading,
+    required this.returningToSchool,
+  });
   final TripData? trip;
-  final Map<String, dynamic>? nextStop;
+  final Map<String, dynamic>? targetStop;
   final double? distance;
+  final TrafficEstimate? trafficEstimate;
+  final bool trafficLoading;
+  final bool returningToSchool;
+
+  String _formatDuration(int seconds) {
+    final minutes = (seconds / 60).round();
+    if (minutes < 60) {
+      return '$minutes min';
+    }
+    final hours = minutes ~/ 60;
+    final remainingMinutes = minutes % 60;
+    return '${hours}h ${remainingMinutes}m';
+  }
+
+  Color _trafficColor(TrafficLevel level) {
+    switch (level) {
+      case TrafficLevel.high:
+        return Colors.red;
+      case TrafficLevel.medium:
+        return Colors.orange;
+      case TrafficLevel.low:
+        return Colors.green;
+      case TrafficLevel.unknown:
+        return Colors.blueGrey;
+    }
+  }
+
+  String _trafficLabel(TrafficLevel level) {
+    switch (level) {
+      case TrafficLevel.high:
+        return 'Heavy Traffic';
+      case TrafficLevel.medium:
+        return 'Moderate Traffic';
+      case TrafficLevel.low:
+        return 'Light Traffic';
+      case TrafficLevel.unknown:
+        return 'Traffic Unavailable';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -428,7 +719,12 @@ class _TopTripPanel extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: Colors.black.withAlpha(20), blurRadius: 10, offset: const Offset(0, 5))],
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withAlpha(20),
+              blurRadius: 10,
+              offset: const Offset(0, 5))
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -439,28 +735,139 @@ class _TopTripPanel extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  nextStop != null ? 'Next: ${nextStop!['studentName'] ?? 'School'}' : 'Route Completed',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  targetStop != null
+                    ? returningToSchool
+                      ? 'Return: ${targetStop!['name'] ?? 'School'}'
+                      : 'Nearest Student: ${targetStop!['studentName'] ?? 'Stop'}'
+                      : 'Route Completed',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 16),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
               if (distance != null)
                 Text(
                   '${(distance! / 1000).toStringAsFixed(1)} km',
-                  style: const TextStyle(color: AppColors.orange, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                      color: AppColors.orange, fontWeight: FontWeight.bold),
                 ),
             ],
           ),
-          if (nextStop != null && nextStop!['addressText'] != null)
+          if (targetStop != null && targetStop!['addressText'] != null)
             Padding(
               padding: const EdgeInsets.only(top: 4, left: 28),
               child: Text(
-                nextStop!['addressText'],
+                targetStop!['addressText'],
                 style: const TextStyle(fontSize: 12, color: Colors.grey),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              if (trafficLoading)
+                const SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else if (trafficEstimate != null)
+                Icon(
+                  Icons.traffic_rounded,
+                  size: 16,
+                  color: _trafficColor(trafficEstimate!.trafficLevel),
+                ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  trafficEstimate == null
+                      ? 'ETA unavailable'
+                      : '${_formatDuration(trafficEstimate!.effectiveDurationSeconds)} • ${_trafficLabel(trafficEstimate!.trafficLevel)}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: trafficEstimate == null
+                        ? Colors.grey
+                        : _trafficColor(trafficEstimate!.trafficLevel),
+                    fontWeight: FontWeight.w600,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReturnToSchoolAction extends StatelessWidget {
+  const _ReturnToSchoolAction({
+    required this.schoolStop,
+    required this.distanceMeters,
+    required this.etaSeconds,
+    required this.onNavigate,
+  });
+
+  final Map<String, dynamic>? schoolStop;
+  final double? distanceMeters;
+  final int? etaSeconds;
+  final VoidCallback? onNavigate;
+
+  String _formatEta(int? seconds) {
+    if (seconds == null) return '--';
+    final minutes = (seconds / 60).round();
+    if (minutes < 60) return '$minutes min';
+    final hours = minutes ~/ 60;
+    final rem = minutes % 60;
+    return '${hours}h ${rem}m';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(26),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.school_rounded, color: AppColors.orange),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  schoolStop?['name']?.toString() ?? 'Return to School',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${distanceMeters == null ? '--' : (distanceMeters! / 1000).toStringAsFixed(1)} km • ETA ${_formatEta(etaSeconds)}',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          FilledButton.tonal(
+            onPressed: onNavigate,
+            child: const Text('Navigate'),
+          ),
         ],
       ),
     );
@@ -482,7 +889,9 @@ class _StartTripOverlay extends StatelessWidget {
         elevation: 10,
       ),
       onPressed: onStart,
-      child: const Text('START TRIP', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+      child: const Text('START TRIP',
+          style: TextStyle(
+              fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
     );
   }
 }
@@ -501,7 +910,9 @@ class _ArrivalDialog extends StatelessWidget {
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('📍 ARRIVED AT STOP', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.orange)),
+          const Text('📍 ARRIVED AT STOP',
+              style: TextStyle(
+                  fontWeight: FontWeight.bold, color: AppColors.orange)),
           const SizedBox(height: 20),
           CircleAvatar(
             radius: 40,
@@ -509,7 +920,9 @@ class _ArrivalDialog extends StatelessWidget {
             child: const Icon(Icons.person, size: 40, color: Colors.grey),
           ),
           const SizedBox(height: 12),
-          Text(stop['studentName'] ?? 'Unknown Student', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          Text(stop['studentName'] ?? 'Unknown Student',
+              style:
+                  const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
           const SizedBox(height: 24),
           Row(
             children: [
@@ -524,7 +937,8 @@ class _ArrivalDialog extends StatelessWidget {
               Expanded(
                 child: ElevatedButton(
                   onPressed: () => onAction(isPickup ? 'boarded' : 'dropped'),
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                  style:
+                      ElevatedButton.styleFrom(backgroundColor: Colors.green),
                   child: Text(isPickup ? 'CHECK IN' : 'CHECK OUT'),
                 ),
               ),
@@ -563,7 +977,10 @@ class _CompleteTripSliderState extends State<_CompleteTripSlider> {
           const Center(
             child: Text(
               'SLIDE TO COMPLETE TRIP',
-              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, letterSpacing: 1),
+              style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1),
             ),
           ),
           SliderTheme(

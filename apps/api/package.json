@@ -6,6 +6,8 @@
   "scripts": {
     "build": "tsc -b ../../packages/shared/tsconfig.json tsconfig.json",
     "create:system-admin": "tsx src/scripts/create-system-admin.ts",
+    "update:demo-admin-passwords": "tsx src/scripts/update-demo-admin-passwords.ts",
+    "upsert:chennai-school-address": "node --env-file=.env --import tsx src/scripts/upsert-chennai-school-address.ts",
     "check:dependencies": "tsx src/scripts/check-dependencies.ts",
     "send:test-email": "tsx src/scripts/send-test-email.ts",
     "dev": "node --env-file=.env --watch --import tsx src/index.ts",

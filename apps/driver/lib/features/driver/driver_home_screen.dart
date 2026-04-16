@@ -20,6 +20,25 @@ class DriverHomeScreen extends StatefulWidget {
 class _DriverHomeScreenState extends State<DriverHomeScreen> {
   bool _loading = false;
 
+  bool _isAuthError(Object error) {
+    final text = error.toString().toLowerCase();
+    return text.contains('invalid jwt') ||
+        text.contains('invalid bearer token') ||
+        text.contains('missing bearer token') ||
+        text.contains('token is expired') ||
+        text.contains('401');
+  }
+
+  void _forceRelogin([String? reason]) {
+    if (!mounted) return;
+    AppScope.of(context).signOut();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(reason ?? 'Session expired. Please sign in again.'),
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -69,8 +88,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
           driverName: user.fullName,
         ));
       }
-    } catch (_) {
-      // Background check, silenty fail
+    } catch (e) {
+      if (_isAuthError(e)) {
+        _forceRelogin();
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -151,7 +172,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                               await api.initializeTrip();
                               await _checkForTrip();
                             } catch (e) {
-                              if (mounted) {
+                              if (_isAuthError(e)) {
+                                _forceRelogin();
+                              } else {
+                                if (!context.mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(content: Text('Failed to initialize: $e')),
                                 );

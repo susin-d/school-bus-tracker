@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'session_manager.dart';
 
 enum AppRole { driver }
 
@@ -88,14 +89,24 @@ class TripData {
 
 
 class AppState extends ChangeNotifier {
+  final _sessionManager = SessionManager();
   LoggedInUser? _currentUser;
   TripData? _currentTrip;
   List<Map<String, dynamic>> _manifestStops = const [];
   bool _loading = false;
   String? _error;
+  bool _isInit = false;
+
+  bool get isInit => _isInit;
 
   LoggedInUser? get currentUser => _currentUser;
   bool get isLoggedIn => _currentUser != null;
+
+  Future<void> loadSession() async {
+    _currentUser = await _sessionManager.loadSession();
+    _isInit = true;
+    notifyListeners();
+  }
 
   TripData? get currentTrip => _currentTrip;
   bool get hasActiveTrip => _currentTrip != null;
@@ -126,6 +137,7 @@ class AppState extends ChangeNotifier {
       busLabel: busLabel,
       busPlate: busPlate,
     );
+    _sessionManager.saveSession(_currentUser!);
     notifyListeners();
   }
 
@@ -136,6 +148,7 @@ class AppState extends ChangeNotifier {
     _manifestStops = const [];
     _loading = false;
     _error = null;
+    _sessionManager.clearSession();
     notifyListeners();
   }
 

@@ -100,15 +100,11 @@ class _ParentHomeScreenState extends State<ParentHomeScreen> {
 
           return Stack(
             children: [
-              CustomHeader(
-                title: 'SchoolBus Tracker',
-                onNotificationTap: () => _showNotifications(context, api),
-              ),
               SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
                 child: Column(
                   children: [
-                    const SizedBox(height: 160), // Spacing for header overlap
+                    const SizedBox(height: 200), // Spacing for header overlap
                     if (student != null) StudentProfileCard(student: student),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -136,6 +132,10 @@ class _ParentHomeScreenState extends State<ParentHomeScreen> {
                     ),
                   ],
                 ),
+              ),
+              CustomHeader(
+                title: 'SchoolBus Tracker',
+                onNotificationTap: () => _showNotifications(context, api),
               ),
             ],
           );
@@ -757,7 +757,6 @@ class _TrackingTab extends StatefulWidget {
 
 class _TrackingTabState extends State<_TrackingTab> {
   Timer? _refreshTimer;
-  int _refreshTick = 0;
   late final Future<Map<String, dynamic>> _currentTripFuture;
   geo.Position? _userPosition;
   final _locationService = LocationService();
@@ -860,7 +859,6 @@ class _TrackingTabState extends State<_TrackingTab> {
           _liveTripData = updates[1] as Map<String, dynamic>?;
           _liveError = null;
         }
-        _refreshTick += 1;
       });
     }
   }

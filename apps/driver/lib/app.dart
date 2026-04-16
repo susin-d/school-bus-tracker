@@ -19,6 +19,7 @@ class _SurakshaAppState extends State<SurakshaApp> {
   void initState() {
     super.initState();
     _appState = AppState();
+    _appState.loadSession();
   }
 
   @override
@@ -31,13 +32,25 @@ class _SurakshaAppState extends State<SurakshaApp> {
   Widget build(BuildContext context) {
     return AppScope(
       appState: _appState,
-      child: MaterialApp(
-        debugShowCheckedModeBanner: false,
-        title: 'SURAKSHA Driver',
-        theme: buildSurakshaLightTheme(),
-        darkTheme: buildSurakshaDarkTheme(),
-        themeMode: ThemeMode.system,
-        home: const AppRouter(),
+      child: ListenableBuilder(
+        listenable: _appState,
+        builder: (context, child) {
+          if (!_appState.isInit) {
+            return const MaterialApp(
+              home: Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              ),
+            );
+          }
+          return MaterialApp(
+            debugShowCheckedModeBanner: false,
+            title: 'SURAKSHA Driver',
+            theme: buildSurakshaLightTheme(),
+            darkTheme: buildSurakshaDarkTheme(),
+            themeMode: ThemeMode.system,
+            home: const AppRouter(),
+          );
+        },
       ),
     );
   }

@@ -23,6 +23,7 @@ import { createResourceRouter } from "./modules/resources/routes.js";
 import { schoolsRouter } from "./modules/schools/routes.js";
 import { studentsRouter } from "./modules/students/routes.js";
 import { tripsRouter } from "./modules/trips/routes.js";
+import { routeOptimizerRouter } from "./routes/route-optimizer";
 
 export const app: Express = express();
 
@@ -137,6 +138,7 @@ app.use("/stops", createResourceRouter("stops"));
 app.use("/buses", createResourceRouter("buses"));
 app.use("/drivers", createResourceRouter("drivers"));
 app.use("/assignments", createResourceRouter("assignments"));
+app.use("/routes", routeOptimizerRouter);
 
 app.use((_request, response) => {
   response.status(404).json({

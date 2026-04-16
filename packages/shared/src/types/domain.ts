@@ -192,6 +192,10 @@ export interface LiveDriverMapItem {
   etaDelayMinutes?: number;
   isDelayed: boolean;
   clusterKey?: string;
+  routePoints?: Array<{
+    latitude: number;
+    longitude: number;
+  }>;
 }
 
 export interface SchoolDispatchLocation {
